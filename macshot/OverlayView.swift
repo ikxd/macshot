@@ -285,7 +285,7 @@ class OverlayView: NSView {
         }
 
         // Draw clear selection region
-        if state != .idle && selectionRect.width > 1 && selectionRect.height > 1 {
+        if state != .idle && selectionRect.width >= 1 && selectionRect.height >= 1 {
             // Clear area inside selection
             context.saveGraphicsState()
             NSBezierPath(rect: selectionRect).setClip()
@@ -423,7 +423,7 @@ class OverlayView: NSView {
     }
 
     private func drawSelectingHelperText() {
-        guard selectionRect.width > 1, selectionRect.height > 1 else { return }
+        guard selectionRect.width >= 1, selectionRect.height >= 1 else { return }
 
         let text: String
         if isRightClickSelecting {

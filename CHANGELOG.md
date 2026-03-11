@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.5] - 2026-03-11
+
+### Fixed
+- **Selection drawing**: Fixed remaining cases where the selection region and "Release to annotate" helper text would disappear when width or height was exactly 1px during drag.
+
 ## [1.2.4] - 2026-03-11
 
 ### Fixed
