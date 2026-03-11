@@ -19,6 +19,7 @@ macshot lives in your menu bar and lets you capture, annotate, and share screens
 - **Floating thumbnail** — thumbnail slides in after capture for quick drag-and-drop (toggleable)
 - **Screenshot history** — re-copy recent captures from the menu bar "Recent Captures" submenu (configurable, in-memory)
 - **Pixel dimensions** — always-visible size label above the selection, click to type an exact resolution
+- **Quick save** — right-click and drag to instantly save a screenshot to your configured folder (default: Pictures)
 - **Output options** — copy to clipboard (`Enter` or `Cmd+C`), save to file (`Cmd+S`)
 - **Multi-monitor support** — captures all screens simultaneously
 - **Configurable hotkey** — change it in Preferences
@@ -67,6 +68,7 @@ cp -R build/Build/Products/Release/macshot.app /Applications/
 | `Cmd+Z` | Undo |
 | `Cmd+Shift+Z` | Redo |
 | `Esc` | Cancel |
+| `Right-click` + drag | Quick save to file (no annotation) |
 | `Shift` (while drawing) | Constrain to straight lines / perfect shapes |
 
 ### Permissions

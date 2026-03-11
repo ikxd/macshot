@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.0] - 2026-03-11
+
+### Added
+- **Right-click quick save**: Right-click and drag to select a region and instantly save it as a PNG — no toolbar, no annotations, just a fast screenshot to disk. File is saved with the format `Screenshot 2026-03-11 at 16.09.19.png`.
+- **Helper text on capture**: On-screen hints guide new users — idle screen shows left-click vs right-click instructions, and while dragging shows what happens on release (annotate or save to folder).
+- **Configurable save folder**: Default save directory changed from Desktop to Pictures. Configurable in Preferences and used by both the Save button and right-click quick save.
+
+### Fixed
+- **Crosshair cursor**: Reliably forces the crosshair cursor on capture start, even when no window was focused.
+- **Pixelate block size**: Pixelation blocks are now a fixed size regardless of selection area.
+
 ## [1.0.7] - 2026-03-11
 
 ### Fixed

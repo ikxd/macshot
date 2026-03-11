@@ -171,7 +171,7 @@ class PreferencesWindowController: NSWindowController {
         if let savePath = UserDefaults.standard.string(forKey: "saveDirectory") {
             savePathField.stringValue = savePath
         } else {
-            savePathField.stringValue = "~/Desktop"
+            savePathField.stringValue = "~/Pictures"
         }
 
         let autoCopy = UserDefaults.standard.object(forKey: "autoCopyToClipboard") as? Bool ?? true

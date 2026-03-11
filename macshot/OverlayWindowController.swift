@@ -170,6 +170,39 @@ extension OverlayWindowController: OverlayViewDelegate {
         }
     }
 
+    func overlayViewDidRequestQuickSave() {
+        guard let image = overlayView?.captureSelectedRegion() else {
+            dismiss()
+            overlayDelegate?.overlayDidCancel(self)
+            return
+        }
+        guard let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else {
+            dismiss()
+            overlayDelegate?.overlayDidCancel(self)
+            return
+        }
+
+        let dirURL: URL
+        if let savedPath = UserDefaults.standard.string(forKey: "saveDirectory") {
+            dirURL = URL(fileURLWithPath: savedPath)
+        } else {
+            dirURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.homeDirectoryForCurrentUser
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        let filename = "Screenshot \(formatter.string(from: Date())).png"
+        let fileURL = dirURL.appendingPathComponent(filename)
+
+        try? pngData.write(to: fileURL)
+        playCopySound()
+        dismiss()
+        overlayDelegate?.overlayDidConfirm(self, capturedImage: image)
+    }
+
     func overlayViewDidRequestSave() {
         guard var image = overlayView?.captureSelectedRegion() else { return }
         image = applyBeautifyIfNeeded(image) ?? image
@@ -185,7 +218,7 @@ extension OverlayWindowController: OverlayViewDelegate {
         if let savedPath = UserDefaults.standard.string(forKey: "saveDirectory") {
             savePanel.directoryURL = URL(fileURLWithPath: savedPath)
         } else {
-            savePanel.directoryURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
+            savePanel.directoryURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
         }
 
         savePanel.begin { [weak self] response in

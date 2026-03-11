@@ -9,6 +9,7 @@ protocol OverlayViewDelegate: AnyObject {
     func overlayViewDidRequestSave()
     func overlayViewDidRequestPin()
     func overlayViewDidRequestOCR()
+    func overlayViewDidRequestQuickSave()
 }
 
 class OverlayView: NSView {
@@ -39,6 +40,7 @@ class OverlayView: NSView {
     private var dragOffset: NSPoint = .zero
     private var moveMode: Bool = false  // move tool active
     private var lastDragPoint: NSPoint?  // for shift constraint on flagsChanged
+    private var isRightClickSelecting: Bool = false  // right-click quick save mode
 
     // Annotations
     private var annotations: [Annotation] = []
@@ -256,6 +258,13 @@ class OverlayView: NSView {
         NSColor.black.withAlphaComponent(0.45).setFill()
         NSBezierPath(rect: bounds).fill()
 
+        // Helper text
+        if state == .idle {
+            drawIdleHelperText()
+        } else if state == .selecting {
+            drawSelectingHelperText()
+        }
+
         // Draw clear selection region
         if state != .idle && selectionRect.width > 1 && selectionRect.height > 1 {
             // Clear area inside selection
@@ -354,6 +363,86 @@ class OverlayView: NSView {
         ToolbarLayout.bgColor.setFill()
         NSBezierPath(roundedRect: tipRect, xRadius: 4, yRadius: 4).fill()
         str.draw(at: NSPoint(x: tipRect.minX + padding, y: tipRect.minY + padding / 2), withAttributes: attrs)
+    }
+
+    private func drawIdleHelperText() {
+        let line1 = "Left-click and drag to select and annotate"
+        let line2 = "Right-click and drag to quick-save to file"
+
+        let font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        let textColor = NSColor.white
+        let dimColor = NSColor.white.withAlphaComponent(0.7)
+
+        let attrs1: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: textColor]
+        let attrs2: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: dimColor]
+
+        let size1 = (line1 as NSString).size(withAttributes: attrs1)
+        let size2 = (line2 as NSString).size(withAttributes: attrs2)
+        let lineSpacing: CGFloat = 8
+        let padding: CGFloat = 14
+        let totalTextHeight = size1.height + lineSpacing + size2.height
+        let bgWidth = max(size1.width, size2.width) + padding * 2
+        let bgHeight = totalTextHeight + padding * 2
+
+        let bgX = bounds.midX - bgWidth / 2
+        let bgY = bounds.midY - bgHeight / 2
+        let bgRect = NSRect(x: bgX, y: bgY, width: bgWidth, height: bgHeight)
+
+        NSColor.black.withAlphaComponent(0.65).setFill()
+        NSBezierPath(roundedRect: bgRect, xRadius: 8, yRadius: 8).fill()
+
+        let textX1 = bounds.midX - size1.width / 2
+        let textX2 = bounds.midX - size2.width / 2
+        let textY1 = bgY + padding + size2.height + lineSpacing
+        let textY2 = bgY + padding
+
+        (line1 as NSString).draw(at: NSPoint(x: textX1, y: textY1), withAttributes: attrs1)
+        (line2 as NSString).draw(at: NSPoint(x: textX2, y: textY2), withAttributes: attrs2)
+    }
+
+    private func drawSelectingHelperText() {
+        guard selectionRect.width > 1, selectionRect.height > 1 else { return }
+
+        let text: String
+        if isRightClickSelecting {
+            let dirURL: URL
+            if let savedPath = UserDefaults.standard.string(forKey: "saveDirectory") {
+                dirURL = URL(fileURLWithPath: savedPath)
+            } else {
+                dirURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
+                    ?? FileManager.default.homeDirectoryForCurrentUser
+            }
+            let folderName = dirURL.lastPathComponent
+            text = "Release to save to \(folderName)/"
+        } else {
+            text = "Release to annotate and edit"
+        }
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+            .foregroundColor: NSColor.white,
+        ]
+        let size = (text as NSString).size(withAttributes: attrs)
+        let padding: CGFloat = 10
+        let bgWidth = size.width + padding * 2
+        let bgHeight = size.height + padding
+
+        // Position below the selection, centered
+        var labelX = selectionRect.midX - bgWidth / 2
+        var labelY = selectionRect.minY - bgHeight - 8
+
+        // If below screen, put above
+        if labelY < bounds.minY + 4 {
+            labelY = selectionRect.maxY + 8
+        }
+        // Clamp horizontal
+        labelX = max(bounds.minX + 4, min(labelX, bounds.maxX - bgWidth - 4))
+
+        let bgRect = NSRect(x: labelX, y: labelY, width: bgWidth, height: bgHeight)
+        NSColor.black.withAlphaComponent(0.65).setFill()
+        NSBezierPath(roundedRect: bgRect, xRadius: 6, yRadius: 6).fill()
+
+        (text as NSString).draw(at: NSPoint(x: bgRect.minX + padding, y: bgRect.minY + padding / 2), withAttributes: attrs)
     }
 
     private func drawSizeLabel() {
@@ -758,6 +847,42 @@ class OverlayView: NSView {
 
         default:
             break
+        }
+    }
+
+    // MARK: - Right-click quick save
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard state == .idle else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        selectionStart = point
+        selectionRect = NSRect(origin: point, size: .zero)
+        isRightClickSelecting = true
+        state = .selecting
+        needsDisplay = true
+    }
+
+    override func rightMouseDragged(with event: NSEvent) {
+        guard isRightClickSelecting else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        let x = min(selectionStart.x, point.x)
+        let y = min(selectionStart.y, point.y)
+        let w = abs(point.x - selectionStart.x)
+        let h = abs(point.y - selectionStart.y)
+        selectionRect = NSRect(x: x, y: y, width: w, height: h)
+        needsDisplay = true
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        guard isRightClickSelecting else { return }
+        isRightClickSelecting = false
+        if selectionRect.width > 5 && selectionRect.height > 5 {
+            state = .selected
+            overlayDelegate?.overlayViewDidRequestQuickSave()
+        } else {
+            state = .idle
+            selectionRect = .zero
+            needsDisplay = true
         }
     }
 
@@ -1432,6 +1557,7 @@ class OverlayView: NSView {
         showToolbars = false
         showColorPicker = false
         moveMode = false
+        isRightClickSelecting = false
         beautifyEnabled = false
         beautifyStyleIndex = 0
         textScrollView?.removeFromSuperview()

@@ -187,7 +187,7 @@ private class PinView: NSView {
         if let savedPath = UserDefaults.standard.string(forKey: "saveDirectory") {
             savePanel.directoryURL = URL(fileURLWithPath: savedPath)
         } else {
-            savePanel.directoryURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
+            savePanel.directoryURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
         }
 
         savePanel.begin { response in
