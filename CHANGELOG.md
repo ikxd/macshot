@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.7] - 2026-03-11
+
+### Fixed
+- **Crosshair cursor**: Reliably forces the crosshair cursor on capture start, even when no window was focused. Previous fix in v1.0.6 was insufficient.
+
 ## [1.0.6] - 2026-03-11
 
 ### Fixed

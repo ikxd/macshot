@@ -75,6 +75,9 @@ class OverlayView: NSView {
     private(set) var beautifyEnabled: Bool = false
     private(set) var beautifyStyleIndex: Int = 0
 
+    // Cursor enforcement timer — forces crosshair until selection is made
+    private var cursorTimer: Timer?
+
     // Color picker popover
     private var showColorPicker: Bool = false
     private var colorPickerRect: NSRect = .zero
@@ -106,12 +109,20 @@ class OverlayView: NSView {
         let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
         addTrackingArea(area)
 
-        // Force crosshair cursor immediately so it doesn't stay as arrow
-        // from the previously focused app (cursor rects are passive and may
-        // not evaluate until the mouse moves).
+        // Keep forcing crosshair until the user finishes drawing a selection.
+        // AppKit's cursor rect system races with app activation and can reset
+        // the cursor to arrow; this timer wins that race by re-setting every frame.
         if window != nil {
-            NSCursor.crosshair.push()
-            window?.invalidateCursorRects(for: self)
+            cursorTimer?.invalidate()
+            cursorTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+                guard let self = self else { timer.invalidate(); return }
+                if self.state == .idle || self.state == .selecting {
+                    NSCursor.crosshair.set()
+                } else {
+                    timer.invalidate()
+                    self.cursorTimer = nil
+                }
+            }
         }
     }
 
@@ -1430,7 +1441,8 @@ class OverlayView: NSView {
         textControlBar = nil
         sizeInputField?.removeFromSuperview()
         sizeInputField = nil
-        NSCursor.pop()
+        cursorTimer?.invalidate()
+        cursorTimer = nil
         needsDisplay = true
     }
 }
