@@ -236,6 +236,10 @@ extension DetachedEditorWindowController: OverlayViewDelegate {
         // Already detached — ignore
     }
 
+    func overlayViewDidRequestScrollCapture(rect: NSRect) {
+        // Scroll capture is not available in the detached editor
+    }
+
     // MARK: - Helpers
 
     private func playCopySound() {

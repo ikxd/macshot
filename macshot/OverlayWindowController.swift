@@ -12,6 +12,7 @@ protocol OverlayWindowControllerDelegate: AnyObject {
     func overlayDidRequestUpload(_ controller: OverlayWindowController, image: NSImage)
     func overlayDidRequestStartRecording(_ controller: OverlayWindowController, rect: NSRect, screen: NSScreen)
     func overlayDidRequestStopRecording(_ controller: OverlayWindowController)
+    func overlayDidRequestScrollCapture(_ controller: OverlayWindowController, rect: NSRect, screen: NSScreen)
 }
 
 /// Manages one fullscreen overlay per screen.
@@ -145,6 +146,12 @@ class OverlayWindowController {
         } else {
             recordingControlWindow?.orderFront(nil)
         }
+    }
+
+    /// Hides the overlay window without destroying state.
+    /// Used during scroll capture so the user can scroll the content underneath.
+    func hideForScrollCapture() {
+        overlayWindow?.orderOut(nil)
     }
 
     func dismiss() {
@@ -290,6 +297,16 @@ extension OverlayWindowController: OverlayViewDelegate {
 
     func overlayViewDidRequestStopRecording() {
         overlayDelegate?.overlayDidRequestStopRecording(self)
+    }
+
+    func overlayViewDidRequestScrollCapture(rect: NSRect) {
+        let screenRect = NSRect(
+            x: screen.frame.minX + rect.minX,
+            y: screen.frame.minY + rect.minY,
+            width: rect.width,
+            height: rect.height
+        )
+        overlayDelegate?.overlayDidRequestScrollCapture(self, rect: screenRect, screen: screen)
     }
 
     func overlayViewDidRequestDetach() {

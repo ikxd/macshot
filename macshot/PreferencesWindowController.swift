@@ -383,6 +383,7 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate {
             (1005, "Remove Background"), (1006, "Auto-Redact sensitive data"),
             (1007, "Delay capture"), (1008, "Translate"),
             (1009, "Record screen"),
+            (1010, "Scroll Capture"),
         ]
         let enabledActions = UserDefaults.standard.array(forKey: "enabledActions") as? [Int]
         let actionsGrid = makeToggleGrid(items: actionItems,
@@ -879,7 +880,7 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate {
         let key = sender.identifier?.rawValue ?? "enabledTools"
         let allTools: [AnnotationTool] = [.pencil, .line, .arrow, .rectangle, .filledRectangle,
                                           .ellipse, .marker, .text, .number, .pixelate, .blur, .loupe, .measure]
-        let allActions: [Int] = [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009]
+        let allActions: [Int] = [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010]
         let defaultValues: [Int] = key == "enabledTools" ? allTools.map { $0.rawValue } : allActions
         var enabled = UserDefaults.standard.array(forKey: key) as? [Int] ?? defaultValues
         if sender.state == .on { if !enabled.contains(sender.tag) { enabled.append(sender.tag) } }

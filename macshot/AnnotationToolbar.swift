@@ -27,6 +27,7 @@ enum ToolbarButtonAction {
     case stopRecord
     case annotationMode
     case detach
+    case scrollCapture
 }
 
 struct ToolbarButton {
@@ -162,7 +163,7 @@ class ToolbarLayout {
     }
 
     // Right toolbar items (output actions + cancel + delay)
-    static func rightButtons(delaySeconds: Int = 0, beautifyEnabled: Bool = false, beautifyStyleIndex: Int = 0, hasAnnotations: Bool = false, translateEnabled: Bool = false, isRecording: Bool = false, isAnnotating: Bool = false) -> [ToolbarButton] {
+    static func rightButtons(delaySeconds: Int = 0, beautifyEnabled: Bool = false, beautifyStyleIndex: Int = 0, hasAnnotations: Bool = false, translateEnabled: Bool = false, isRecording: Bool = false, isAnnotating: Bool = false, isDetached: Bool = false) -> [ToolbarButton] {
         var buttons: [ToolbarButton] = []
 
         // If currently recording, show annotation mode toggle + stop
@@ -177,7 +178,7 @@ class ToolbarLayout {
             return buttons
         }
 
-        let allKnownActionTags: [Int] = [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009]
+        let allKnownActionTags: [Int] = [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010]
         // Migrate: only add action tags that are brand-new (never seen before).
         // knownActionTags tracks which tags have been introduced so user-disabled tags are
         // never silently re-enabled when future versions add new action tags.
@@ -260,6 +261,11 @@ class ToolbarLayout {
             var recordBtn = ToolbarButton(action: .record, sfSymbol: "record.circle", label: nil, tooltip: "Record")
             recordBtn.tintColor = .systemRed
             buttons.append(recordBtn)
+        }
+
+        // Scroll Capture (tag 1010) — hidden when recording or in detached editor
+        if !isRecording && !isDetached && actionEnabled(1010) {
+            buttons.append(ToolbarButton(action: .scrollCapture, sfSymbol: "scroll", label: nil, tooltip: "Scroll Capture"))
         }
 
         return buttons

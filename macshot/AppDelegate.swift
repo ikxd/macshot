@@ -17,6 +17,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var uploadToastController: UploadToastController?
     private var recordingEngine: RecordingEngine?
     private var recordingOverlayController: OverlayWindowController?
+    private var scrollCaptureController: ScrollCaptureController?
+    private var scrollCaptureHUD: ScrollCaptureHUDController?
+    private var scrollCaptureScreen: NSScreen?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupMainMenu()
@@ -442,6 +445,62 @@ extension AppDelegate: OverlayWindowControllerDelegate {
 
     func overlayDidRequestStopRecording(_ controller: OverlayWindowController) {
         recordingEngine?.stopRecording()
+    }
+
+    func overlayDidRequestScrollCapture(_ controller: OverlayWindowController, rect: NSRect, screen: NSScreen) {
+        scrollCaptureScreen = screen
+
+        // Hide all overlay windows so the user can freely scroll underlying content
+        for oc in overlayControllers { oc.hideForScrollCapture() }
+
+        // Build HUD anchored beside the selection rect
+        let hud = ScrollCaptureHUDController(selectionRectScreen: rect, screen: screen)
+        scrollCaptureHUD = hud
+        hud.onStop = { [weak self] in
+            self?.finalizeScrollCapture()
+        }
+        hud.show()
+
+        // Start the capture session
+        let scc = ScrollCaptureController(captureRect: rect, screen: screen)
+        scrollCaptureController = scc
+
+        scc.onStripAdded = { [weak self] count in
+            guard let self = self, let scc = self.scrollCaptureController else { return }
+            self.scrollCaptureHUD?.update(
+                stripCount: count,
+                stitchedImage: scc.stitchedImage,
+                pixelSize: scc.stitchedPixelSize
+            )
+        }
+        scc.onSessionDone = { [weak self] finalImage in
+            self?.handleScrollCaptureCompleted(finalImage: finalImage)
+        }
+
+        Task { await scc.startSession() }
+    }
+
+    private func finalizeScrollCapture() {
+        scrollCaptureController?.stopSession()
+        // onSessionDone fires asynchronously and calls handleScrollCaptureCompleted
+    }
+
+    private func handleScrollCaptureCompleted(finalImage: NSImage?) {
+        scrollCaptureHUD?.dismiss()
+        scrollCaptureHUD = nil
+        scrollCaptureController = nil
+        scrollCaptureScreen = nil
+
+        // Fully tear down the overlay controllers
+        dismissOverlays()
+
+        guard let image = finalImage else { return }
+
+        ScreenshotHistory.shared.add(image: image)
+        let autoCopy = UserDefaults.standard.object(forKey: "autoCopyToClipboard") as? Bool ?? true
+        if autoCopy { ImageEncoder.copyToClipboard(image) }
+        playCopySound()
+        showFloatingThumbnail(image: image)
     }
 
     private func showRecordingCompletedToast(url: URL) {

@@ -18,6 +18,7 @@ protocol OverlayViewDelegate: AnyObject {
     func overlayViewDidRequestStartRecording(rect: NSRect)
     func overlayViewDidRequestStopRecording()
     func overlayViewDidRequestDetach()
+    func overlayViewDidRequestScrollCapture(rect: NSRect)
 }
 
 /// An entry in the undo/redo history.
@@ -3170,7 +3171,7 @@ class OverlayView: NSView {
     func rebuildToolbarLayout() {
         let movableAnnotations = annotations.contains { $0.isMovable }
         bottomButtons = ToolbarLayout.bottomButtons(selectedTool: currentTool, selectedColor: currentColor, beautifyEnabled: beautifyEnabled, beautifyStyleIndex: beautifyStyleIndex, hasAnnotations: movableAnnotations, isRecording: isRecording, isAnnotating: isAnnotating)
-        rightButtons = ToolbarLayout.rightButtons(delaySeconds: delaySeconds, beautifyEnabled: beautifyEnabled, beautifyStyleIndex: beautifyStyleIndex, hasAnnotations: movableAnnotations, translateEnabled: translateEnabled, isRecording: isRecording, isAnnotating: isAnnotating)
+        rightButtons = ToolbarLayout.rightButtons(delaySeconds: delaySeconds, beautifyEnabled: beautifyEnabled, beautifyStyleIndex: beautifyStyleIndex, hasAnnotations: movableAnnotations, translateEnabled: translateEnabled, isRecording: isRecording, isAnnotating: isAnnotating, isDetached: isDetached)
         // In detached mode: remove buttons that only make sense in overlay (detach, delay, moveSelection, cancel→close handled by window chrome)
         if isDetached {
             rightButtons = rightButtons.filter {
@@ -4402,6 +4403,8 @@ class OverlayView: NSView {
             overlayDelegate?.overlayViewDidCancel()
         case .detach:
             overlayDelegate?.overlayViewDidRequestDetach()
+        case .scrollCapture:
+            overlayDelegate?.overlayViewDidRequestScrollCapture(rect: selectionRect)
         }
     }
 
