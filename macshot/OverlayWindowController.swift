@@ -149,6 +149,7 @@ class OverlayWindowController {
 
     func dismiss() {
         dismissRecordingControlWindow()
+        saveSelectionIfNeeded()
         overlayView?.reset()
         overlayView?.screenshotImage = nil
         overlayView?.overlayDelegate = nil
@@ -157,6 +158,14 @@ class OverlayWindowController {
         overlayWindow?.orderOut(nil)
         overlayWindow?.close()
         overlayWindow = nil
+    }
+
+    private func saveSelectionIfNeeded() {
+        guard UserDefaults.standard.bool(forKey: "rememberLastSelection"),
+              let view = overlayView, view.state == .selected,
+              view.selectionRect.width > 1, view.selectionRect.height > 1 else { return }
+        UserDefaults.standard.set(NSStringFromRect(view.selectionRect), forKey: "lastSelectionRect")
+        UserDefaults.standard.set(NSStringFromRect(screen.frame), forKey: "lastSelectionScreenFrame")
     }
 
     private static let captureSound: NSSound? = {

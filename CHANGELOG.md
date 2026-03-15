@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.1.4] - 2026-03-15
+
+### Added
+- **Color opacity slider** — the color picker popup now has an opacity slider below the swatches. Drag it to set transparency for all drawing tools (pencil, line, arrow, rectangle, filled rectangle, ellipse, text, numbered markers). Marker keeps its own fixed highlight opacity. Opacity is remembered across captures within the same session.
+- **Floating thumbnail action buttons** — hovering the thumbnail now shows a dark overlay with six action buttons: Copy, Save (center), Close, Pin, Edit, Upload (corners). Clicking anywhere else on the thumbnail dismisses it as before.
+- **Stackable thumbnails** — multiple captures now stack vertically instead of replacing each other. When a thumbnail is dismissed, the ones below animate up. Configurable in Preferences: "Stack (keep all)" or "Replace (show only latest)".
+- **Configurable thumbnail auto-dismiss** — set how many seconds before the thumbnail auto-dismisses (0 = never). Configurable in Preferences (default: 5 seconds).
+- **Remember last selection** — new Preferences toggle: "Remember last selection area". When enabled, the last selection rect is restored on the matching screen every time you open the capture overlay.
+- **Hover-to-move annotations** — when a shape or drawing tool is active, hovering over an existing annotation shows its edit controls (handles, delete button) and the open-hand cursor. You can drag it to reposition or click a handle to resize without switching to the Select tool. Delete key also removes the hovered annotation.
+- **Marker cursor preview** — while the marker tool is active, a semi-transparent circle follows the cursor showing the exact marker size and color before you start drawing.
+- **Delete key removes annotations** — pressing Delete (Backspace) removes the currently selected or hovered annotation without needing to click the ✕ button.
+- **Undo/redo deletions** — deleting an annotation (via button or Delete key) is now undoable with Cmd+Z. Previously only additions were undoable.
+
+### Improved
+- **Window snap performance** — the `CGWindowListCopyWindowInfo` lookup now runs on a background thread and skips overlapping queries, eliminating UI stalls when moving the mouse quickly in snap mode.
+- **Thumbnail size** — doubled from 160 px max-width to 320 px for better visibility.
+- **Quick-save threshold** — a single-pixel drag now counts as a valid selection for right-click quick-save (previously required >5 px in both dimensions).
+- **Undo/redo architecture** — rewritten with a proper `UndoEntry` enum that tracks both additions and deletions, so the full history is preserved when opening in the editor window.
+- **Tool persistence** — the last-used drawing tool is now remembered across captures within the same session (was always resetting to arrow).
+
+### Fixed
+- **Bezier hit-test** — curved lines and arrows now use the cubic formula that matches NSBezierPath `curve(to:controlPoint1:controlPoint2:)`, so clicking near a bent arrow selects it correctly.
+
 ## [2.1.3] - 2026-03-15
 
 ### Added

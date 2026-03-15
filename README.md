@@ -21,6 +21,8 @@ macshot lives in your menu bar and lets you capture, annotate, and share screens
 - **Window snap** — hover over any window to highlight it with a blue border and click to snap to it; `Tab` toggles snap mode, `F` captures full screen
 - **Live QR & barcode detection** — automatically detects QR codes and barcodes in the selected area; shows an inline bar to open URLs or copy the payload
 - **Annotation tools** — arrow, line, rectangle, filled rectangle, ellipse, pencil (with optional smooth strokes), marker/highlighter, text, numbered markers, pixelate, Gaussian blur
+- **Color opacity** — drag the opacity slider in the color picker to set transparency for all drawing tools; marker keeps its own highlight opacity
+- **Hover-to-move** — hover over any annotation with a drawing tool active to instantly drag, resize, or delete it without switching to the Select tool
 - **Rich text** — bold, italic, underline, strikethrough, adjustable font size; `Enter` inserts a new line; confirm with ✓ button
 - **Translation** — translate extracted OCR text to any language directly in the OCR results window
 - **Shift-constrain** — hold Shift while drawing for straight lines, perfect circles, and squares
@@ -33,7 +35,7 @@ macshot lives in your menu bar and lets you capture, annotate, and share screens
 - **Beautify mode** — wrap screenshots in a macOS window frame with traffic lights, shadow, and gradient background (6 styles)
 - **Background removal** — remove the background from any selection using Apple Vision (macOS 14+)
 - **Pin to screen** — pin a screenshot as a floating always-on-top window, movable and resizable; open in editor with the pencil button
-- **Floating thumbnail** — thumbnail slides in after capture for quick drag-and-drop (toggleable)
+- **Floating thumbnail** — thumbnail slides in after capture with Copy/Save/Pin/Edit/Upload action buttons on hover; multiple thumbnails stack vertically; configurable auto-dismiss delay (toggleable)
 - **Screenshot history** — re-copy recent captures from the menu bar "Recent Captures" submenu (configurable, in-memory)
 - **Upload to imgbb** — one-click upload; view and copy upload/delete URLs in Preferences → Uploads
 - **Pixel dimensions** — always-visible size label above the selection, click to type an exact resolution

@@ -180,14 +180,15 @@ class Annotation {
     // MARK: - Geometry helpers
 
     private func distanceToQuadCurve(point: NSPoint, from a: NSPoint, control c: NSPoint, to b: NSPoint) -> CGFloat {
-        // Sample the quadratic bezier at N steps and find the minimum distance
-        let steps = 30
+        // The curve is drawn as a cubic bezier with cp1 == cp2 == c (NSBezierPath.curve),
+        // so sample the cubic formula to match the actual rendered path.
+        let steps = 40
         var minDist = CGFloat.greatestFiniteMagnitude
         for i in 0...steps {
             let t = CGFloat(i) / CGFloat(steps)
             let u = 1 - t
-            let px = u*u*a.x + 2*u*t*c.x + t*t*b.x
-            let py = u*u*a.y + 2*u*t*c.y + t*t*b.y
+            let px = u*u*u*a.x + 3*u*u*t*c.x + 3*u*t*t*c.x + t*t*t*b.x
+            let py = u*u*u*a.y + 3*u*u*t*c.y + 3*u*t*t*c.y + t*t*t*b.y
             let d = hypot(point.x - px, point.y - py)
             if d < minDist { minDist = d }
         }
@@ -209,7 +210,7 @@ class Annotation {
 
         switch tool {
         case .pencil:
-            drawFreeform(alpha: 1.0, width: strokeWidth)
+            drawFreeform(alpha: color.alphaComponent, width: strokeWidth)
         case .line:
             drawStraightLine()
         case .arrow:

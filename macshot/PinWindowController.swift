@@ -78,6 +78,7 @@ class PinWindowController {
             screenshotImage: image,
             selectionRect: NSRect(origin: .zero, size: image.size),
             annotations: [],
+            undoStack: [],
             redoStack: [],
             currentTool: .arrow,
             currentColor: .red,

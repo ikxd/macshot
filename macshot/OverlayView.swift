@@ -20,12 +20,23 @@ protocol OverlayViewDelegate: AnyObject {
     func overlayViewDidRequestDetach()
 }
 
+/// An entry in the undo/redo history.
+enum UndoEntry {
+    case added(Annotation)          // annotation was added; undo removes it
+    case deleted(Annotation, Int)   // annotation was deleted at index; undo re-inserts it
+
+    var annotation: Annotation {
+        switch self { case .added(let a), .deleted(let a, _): return a }
+    }
+}
+
 /// Snapshot of the mutable editor state used to transfer from overlay → detached window.
 struct OverlayEditorState {
     var screenshotImage: NSImage?
     var selectionRect: NSRect
     var annotations: [Annotation]
-    var redoStack: [Annotation]
+    var undoStack: [UndoEntry]
+    var redoStack: [UndoEntry]
     var currentTool: AnnotationTool
     var currentColor: NSColor
     var currentStrokeWidth: CGFloat
@@ -79,7 +90,7 @@ class OverlayView: NSView {
     private let zoomMax: CGFloat = 8.0
 
     // Selection
-    private var selectionRect: NSRect = .zero
+    private(set) var selectionRect: NSRect = .zero
     private var selectionStart: NSPoint = .zero
     private var isDraggingSelection: Bool = false
     private var isResizingSelection: Bool = false
@@ -91,10 +102,22 @@ class OverlayView: NSView {
 
     // Annotations
     private var annotations: [Annotation] = [] { didSet { cachedCompositedImage = nil } }
-    private var redoStack: [Annotation] = []
+    private var undoStack: [UndoEntry] = []
+    private var redoStack: [UndoEntry] = []
     private var currentAnnotation: Annotation?
-    private var currentTool: AnnotationTool = .arrow
+    /// Last tool the user explicitly picked — shared across overlay instances within one app session.
+    private static var lastUsedTool: AnnotationTool = .arrow
+    private var currentTool: AnnotationTool = OverlayView.lastUsedTool {
+        didSet {
+            // Persist drawing tool choices; skip transient/mode tools
+            if currentTool != .select && currentTool != .loupe {
+                OverlayView.lastUsedTool = currentTool
+            }
+        }
+    }
     private var currentColor: NSColor = .systemRed
+    /// currentColor with opacity applied — used for all tools except marker, loupe, measure, pixelate, blur
+    private var annotationColor: NSColor { currentColor.withAlphaComponent(currentColorOpacity) }
     private var currentStrokeWidth: CGFloat = {
         let saved = UserDefaults.standard.object(forKey: "currentStrokeWidth") as? Double
         return saved != nil ? CGFloat(saved!) : 3.0
@@ -114,6 +137,10 @@ class OverlayView: NSView {
     private var isDraggingAnnotation: Bool = false
     private var annotationDragStart: NSPoint = .zero
     private var toolBeforeSelect: AnnotationTool?  // for middle-click toggle
+    /// Annotation under the cursor when using a non-select drawing tool — enables on-the-fly move without switching tools.
+    private var hoveredAnnotation: Annotation?
+    /// Delays clearing hoveredAnnotation so the cursor can travel to handles/buttons that sit outside the hit area.
+    private var hoveredAnnotationClearTimer: Timer?
 
     // Text editing
     private var textEditView: NSTextView?
@@ -216,6 +243,7 @@ class OverlayView: NSView {
         return saved != nil ? CGFloat(saved!) : 120.0
     }()
     private var loupeCursorPoint: NSPoint = .zero
+    private var markerCursorPoint: NSPoint = .zero
     private var cachedCompositedImage: NSImage? = nil  // invalidated when annotations change
     private var showLoupeSizePicker: Bool = false
     private var loupeSizePickerRect: NSRect = .zero
@@ -317,6 +345,12 @@ class OverlayView: NSView {
                 NSApp.activate(ignoringOtherApps: true)
             } else {
                 window?.orderFrontRegardless()
+                // Switching to pass-through — clear any hover state so annotations
+                // don't show edit controls while the cursor roams freely underneath.
+                hoveredAnnotationClearTimer?.invalidate()
+                hoveredAnnotationClearTimer = nil
+                hoveredAnnotation = nil
+                selectedAnnotation = nil
             }
             onAnnotationModeChanged?(isAnnotating)
             needsDisplay = true
@@ -329,6 +363,7 @@ class OverlayView: NSView {
         set { UserDefaults.standard.set(newValue, forKey: "windowSnapEnabled") }
     }
     private var hoveredWindowRect: NSRect? = nil
+    private var windowSnapQueryInFlight: Bool = false
     private let availableColors: [NSColor] = [
         .systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .systemPurple,
         .systemPink, .systemTeal, .systemIndigo, .systemBrown, .systemMint, .systemCyan,
@@ -350,6 +385,10 @@ class OverlayView: NSView {
     private var isDraggingBrightnessSlider: Bool = false
     private var customPickerHue: CGFloat = 0
     private var customPickerSaturation: CGFloat = 1
+    private static var lastUsedOpacity: CGFloat = 1.0
+    private var currentColorOpacity: CGFloat = OverlayView.lastUsedOpacity
+    private var opacitySliderRect: NSRect = .zero
+    private var isDraggingOpacitySlider: Bool = false
 
     // Radial color wheel (right-click in drawing mode)
     private var showColorWheel: Bool = false
@@ -405,13 +444,33 @@ class OverlayView: NSView {
     override func mouseMoved(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
 
-        // Window snap: highlight hovered window in idle state
-        if state == .idle && windowSnapEnabled {
-            let screenPoint = window.map { NSPoint(x: $0.frame.origin.x + point.x, y: $0.frame.origin.y + point.y) }
-            let newRect = screenPoint.flatMap { windowRect(at: $0) }
-            if newRect != hoveredWindowRect {
-                hoveredWindowRect = newRect
-                needsDisplay = true
+        // Window snap: highlight hovered window in idle state.
+        // CGWindowListCopyWindowInfo is expensive — run it on a background thread,
+        // skipping new queries while one is already in flight.
+        if state == .idle && windowSnapEnabled && !windowSnapQueryInFlight {
+            guard let screenPoint = window.map({ NSPoint(x: $0.frame.origin.x + point.x, y: $0.frame.origin.y + point.y) }),
+                  let viewWindow = window else { return }
+            let overlayWindowNumber = viewWindow.windowNumber
+            let windowOrigin = viewWindow.frame.origin
+            let viewBounds = bounds
+            let screenH = NSScreen.screens.map { $0.frame.maxY }.max() ?? NSScreen.main?.frame.height ?? 0
+            windowSnapQueryInFlight = true
+            DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+                let newRect = Self.windowRectOnBackground(
+                    screenPoint: screenPoint,
+                    overlayWindowNumber: overlayWindowNumber,
+                    windowOrigin: windowOrigin,
+                    viewBounds: viewBounds,
+                    screenH: screenH
+                )
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    self.windowSnapQueryInFlight = false
+                    if newRect != self.hoveredWindowRect {
+                        self.hoveredWindowRect = newRect
+                        self.needsDisplay = true
+                    }
+                }
             }
         }
 
@@ -422,6 +481,17 @@ class OverlayView: NSView {
                 loupeCursorPoint = newPoint
                 needsDisplay = true
             }
+        }
+
+        // Track cursor for marker size preview circle
+        if state == .selected && currentTool == .marker {
+            if point != markerCursorPoint {
+                markerCursorPoint = point
+                needsDisplay = true
+            }
+        } else if markerCursorPoint != .zero {
+            markerCursorPoint = .zero
+            needsDisplay = true
         }
 
         guard showToolbars else { return }
@@ -523,6 +593,62 @@ class OverlayView: NSView {
                 if rowRect.contains(point) { newRow = i; break }
             }
             if newRow != hoveredTranslateRow { hoveredTranslateRow = newRow; needsDisplay = true }
+        }
+
+        // Hover-to-move: only active for the core shape/drawing tools.
+        let hoverMoveTools: Set<AnnotationTool> = [.pencil, .arrow, .line, .rectangle, .filledRectangle, .ellipse]
+        // Hover-to-move: when a drawing tool is active and the cursor is over a movable annotation,
+        // temporarily show the open-hand cursor so the user can move it without switching tools.
+        // Disabled entirely in pass-through mode (recording with annotation off).
+        if isRecording && !isAnnotating {
+            if hoveredAnnotation != nil {
+                hoveredAnnotationClearTimer?.invalidate()
+                hoveredAnnotationClearTimer = nil
+                hoveredAnnotation = nil
+                needsDisplay = true
+            }
+            return
+        }
+        if state == .selected && hoverMoveTools.contains(currentTool) && !isDraggingAnnotation && !isResizingAnnotation {
+            let canvasPoint = viewToCanvas(point)
+            let newHovered = annotations.reversed().first { $0.isMovable && $0.hitTest(point: canvasPoint) }
+
+            if newHovered !== nil {
+                // Cursor is directly over an annotation — show controls immediately.
+                hoveredAnnotationClearTimer?.invalidate()
+                hoveredAnnotationClearTimer = nil
+                if newHovered !== hoveredAnnotation {
+                    hoveredAnnotation = newHovered
+                    window?.invalidateCursorRects(for: self)
+                    needsDisplay = true
+                }
+            } else if hoveredAnnotation != nil {
+                // Cursor left the annotation hit area. Check if it's within the extended controls
+                // zone (handles + delete button sit outside the hit area) — if so, keep hoveredAnnotation.
+                let controlsActive = annotationDeleteButtonRect.contains(point)
+                    || annotationResizeHandleRects.contains { $0.1.insetBy(dx: -8, dy: -8).contains(point) }
+
+                if controlsActive {
+                    // Inside a control rect — cancel any pending clear and stay active.
+                    hoveredAnnotationClearTimer?.invalidate()
+                    hoveredAnnotationClearTimer = nil
+                } else if hoveredAnnotationClearTimer == nil {
+                    // Start a linger timer — gives the cursor time to travel to a nearby handle/button.
+                    hoveredAnnotationClearTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
+                        guard let self = self else { return }
+                        self.hoveredAnnotationClearTimer = nil
+                        self.hoveredAnnotation = nil
+                        self.window?.invalidateCursorRects(for: self)
+                        self.needsDisplay = true
+                    }
+                }
+            }
+        } else if hoveredAnnotation != nil && (!hoverMoveTools.contains(currentTool) || isDraggingAnnotation || isResizingAnnotation) {
+            hoveredAnnotationClearTimer?.invalidate()
+            hoveredAnnotationClearTimer = nil
+            hoveredAnnotation = nil
+            window?.invalidateCursorRects(for: self)
+            needsDisplay = true
         }
     }
 
@@ -697,6 +823,16 @@ class OverlayView: NSView {
             addCursorRect(innerRect, cursor: selectionCursor)
         }
 
+        // Hover-to-move: openHand over a hovered annotation when using a shape/drawing tool
+        let hoverMoveToolsForCursor: Set<AnnotationTool> = [.pencil, .arrow, .line, .rectangle, .filledRectangle, .ellipse]
+        if hoverMoveToolsForCursor.contains(currentTool), let hovered = hoveredAnnotation {
+            // Use a generous inset so the cursor rect covers the annotation's visual bounds
+            let bb = hovered.boundingRect.insetBy(dx: -12, dy: -12)
+            if bb.width > 0 && bb.height > 0 {
+                addCursorRect(bb, cursor: .openHand)
+            }
+        }
+
         // When select tool is active, layer annotation-specific cursors on top
         if currentTool == .select, let selected = selectedAnnotation {
             // Annotation bounding box interior → move cursor (already covered by openHand above)
@@ -791,8 +927,15 @@ class OverlayView: NSView {
             }
             if let selected = selectedAnnotation, currentTool == .select {
                 drawAnnotationControls(for: selected)
+            } else if let hovered = hoveredAnnotation, [AnnotationTool.pencil, .arrow, .line, .rectangle, .filledRectangle, .ellipse].contains(currentTool) {
+                drawAnnotationControls(for: hovered)
             }
             context.restoreGraphicsState()
+
+            // Marker cursor preview circle (detached mode)
+            if currentTool == .marker && markerCursorPoint != .zero && selectionRect.contains(markerCursorPoint) && currentAnnotation == nil {
+                drawMarkerCursorPreview(at: markerCursorPoint)
+            }
 
             // Crop overlay: dim outside the crop rect, dashed border inside
             if isCropDragging && cropDragRect.width > 2 && cropDragRect.height > 2 {
@@ -919,12 +1062,22 @@ class OverlayView: NSView {
                 drawLoupePreview(at: loupeCursorPoint)
             }
 
-            // Draw selection highlight for selected annotation
-            if let selected = selectedAnnotation, currentTool == .select {
-                drawAnnotationControls(for: selected)
+            // Draw selection highlight for selected annotation (or hovered annotation in drawing mode)
+            // Suppressed in pass-through mode so annotations are purely visual overlays.
+            if !(isRecording && !isAnnotating) {
+                if let selected = selectedAnnotation, currentTool == .select {
+                    drawAnnotationControls(for: selected)
+                } else if let hovered = hoveredAnnotation, [AnnotationTool.pencil, .arrow, .line, .rectangle, .filledRectangle, .ellipse].contains(currentTool) {
+                    drawAnnotationControls(for: hovered)
+                }
             }
 
             context.restoreGraphicsState()
+
+            // Marker cursor preview circle
+            if currentTool == .marker && markerCursorPoint != .zero && selectionRect.contains(markerCursorPoint) && currentAnnotation == nil {
+                drawMarkerCursorPreview(at: markerCursorPoint)
+            }
 
             // Selection border (purple like Flameshot)
             let borderPath = NSBezierPath(rect: selectionRect)
@@ -1504,7 +1657,8 @@ class OverlayView: NSView {
         let swatchSize: CGFloat = 24
         let padding: CGFloat = 6
         let pickerWidth = CGFloat(cols) * (swatchSize + padding) + padding
-        var pickerHeight = CGFloat(rows) * (swatchSize + padding) + padding
+        let opacityBarHeight: CGFloat = 12
+        var pickerHeight = CGFloat(rows) * (swatchSize + padding) + padding + padding + opacityBarHeight + padding
 
         // Extra height for inline HSB picker
         let gradientSize: CGFloat = 140
@@ -1609,10 +1763,71 @@ class OverlayView: NSView {
         let plusSize = plusStr.size(withAttributes: plusAttrs)
         plusStr.draw(at: NSPoint(x: customRect.midX - plusSize.width / 2, y: customRect.midY - plusSize.height / 2), withAttributes: plusAttrs)
 
+        // Opacity slider (always visible, below swatches)
+        do {
+            let swatchRowsHeight = CGFloat(rows) * (swatchSize + padding) + padding
+            let opacityY = colorPickerRect.maxY - swatchRowsHeight - padding - opacityBarHeight
+            let opacityX = colorPickerRect.minX + padding
+            let opacityW = pickerWidth - padding * 2
+            let oRect = NSRect(x: opacityX, y: opacityY, width: opacityW, height: opacityBarHeight)
+            opacitySliderRect = oRect
+
+            // Checkerboard background to indicate transparency
+            let checkSize: CGFloat = opacityBarHeight / 2
+            NSGraphicsContext.current?.saveGraphicsState()
+            let checkPath = NSBezierPath(roundedRect: oRect, xRadius: 4, yRadius: 4)
+            checkPath.addClip()
+            let cols2 = Int(ceil(opacityW / checkSize))
+            for ci in 0...cols2 {
+                for ri in 0...1 {
+                    if (ci + ri) % 2 == 0 {
+                        NSColor(white: 0.5, alpha: 1).setFill()
+                    } else {
+                        NSColor(white: 0.7, alpha: 1).setFill()
+                    }
+                    NSRect(x: oRect.minX + CGFloat(ci) * checkSize, y: oRect.minY + CGFloat(ri) * checkSize,
+                           width: checkSize, height: checkSize).fill()
+                }
+            }
+            NSGraphicsContext.current?.restoreGraphicsState()
+
+            // Gradient overlay: transparent color to opaque color
+            let oPath = NSBezierPath(roundedRect: oRect, xRadius: 4, yRadius: 4)
+            let oGrad = NSGradient(starting: currentColor.withAlphaComponent(0), ending: currentColor.withAlphaComponent(1))
+            oGrad?.draw(in: oPath, angle: 0)
+
+            // Thin border
+            NSColor.white.withAlphaComponent(0.3).setStroke()
+            let oBorder = NSBezierPath(roundedRect: oRect, xRadius: 4, yRadius: 4)
+            oBorder.lineWidth = 0.5
+            oBorder.stroke()
+
+            // Thumb indicator
+            let thumbX = oRect.minX + currentColorOpacity * oRect.width
+            let thumbH: CGFloat = opacityBarHeight + 4
+            let thumbRect = NSRect(x: thumbX - 4, y: oRect.midY - thumbH / 2, width: 8, height: thumbH)
+            NSColor.white.setFill()
+            NSBezierPath(roundedRect: thumbRect, xRadius: 3, yRadius: 3).fill()
+            NSColor.black.withAlphaComponent(0.3).setStroke()
+            let thumbBorder = NSBezierPath(roundedRect: thumbRect, xRadius: 3, yRadius: 3)
+            thumbBorder.lineWidth = 0.5
+            thumbBorder.stroke()
+
+            // "Opacity" label
+            let opacityPct = Int(currentColorOpacity * 100)
+            let labelAttrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 8, weight: .medium),
+                .foregroundColor: NSColor.white.withAlphaComponent(0.8),
+            ]
+            let labelStr = "\(opacityPct)%" as NSString
+            let labelSize = labelStr.size(withAttributes: labelAttrs)
+            labelStr.draw(at: NSPoint(x: oRect.maxX - labelSize.width - 2, y: oRect.midY - labelSize.height / 2), withAttributes: labelAttrs)
+        }
+
         // Inline HSB color picker
         if showCustomColorPicker {
             let swatchRowsHeight = CGFloat(rows) * (swatchSize + padding) + padding
-            let gradientY = colorPickerRect.maxY - swatchRowsHeight - padding - gradientSize
+            let gradientY = colorPickerRect.maxY - swatchRowsHeight - padding - opacityBarHeight - padding - gradientSize
             let gradientX = colorPickerRect.minX + padding
             let gradientW = pickerWidth - padding * 2
             let gradRect = NSRect(x: gradientX, y: gradientY, width: gradientW, height: gradientSize)
@@ -2191,6 +2406,21 @@ class OverlayView: NSView {
         }
     }
 
+    // MARK: - Marker Cursor Preview
+
+    private func drawMarkerCursorPreview(at center: NSPoint) {
+        let radius = (currentMarkerSize * 6) / 2
+        let circleRect = NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+        let path = NSBezierPath(ovalIn: circleRect)
+        // Fill with marker color at marker opacity
+        currentColor.withAlphaComponent(0.35).setFill()
+        path.fill()
+        // Thin border so the circle is visible on any background
+        currentColor.withAlphaComponent(0.7).setStroke()
+        path.lineWidth = 1.0
+        path.stroke()
+    }
+
     // MARK: - Loupe Preview
 
     private func drawLoupePreview(at center: NSPoint) {
@@ -2439,7 +2669,8 @@ class OverlayView: NSView {
         let dx = selectionRect.minX - canvasRect.minX
         let dy = selectionRect.minY - canvasRect.minY
         for ann in annotations { ann.move(dx: dx, dy: dy) }
-        for ann in redoStack   { ann.move(dx: dx, dy: dy) }
+        for entry in undoStack { entry.annotation.move(dx: dx, dy: dy) }
+        for entry in redoStack { entry.annotation.move(dx: dx, dy: dy) }
 
         screenshotImage = NSImage(cgImage: croppedCG,
                                   size: NSSize(width: croppedCG.width, height: croppedCG.height))
@@ -2717,11 +2948,14 @@ class OverlayView: NSView {
 
     /// Returns the frontmost visible window rect (in view coordinates) that contains `screenPoint`.
     /// `screenPoint` is in AppKit screen coordinates (origin bottom-left of main screen).
-    private func windowRect(at screenPoint: NSPoint) -> NSRect? {
+    private static func windowRectOnBackground(
+        screenPoint: NSPoint,
+        overlayWindowNumber: Int,
+        windowOrigin: NSPoint,
+        viewBounds: NSRect,
+        screenH: CGFloat
+    ) -> NSRect? {
         guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
-
-        // The overlay window itself — skip it
-        let overlayWindowNumber = window?.windowNumber ?? -1
 
         for info in windowList {
             guard let layer = info[kCGWindowLayer as String] as? Int, layer == 0,
@@ -2729,29 +2963,21 @@ class OverlayView: NSView {
                   let winNum = info[kCGWindowNumber as String] as? Int,
                   winNum != overlayWindowNumber else { continue }
 
-            // CGWindow bounds are in screen coordinates with origin top-left
             let cgX = boundsDict["X"] ?? 0
             let cgY = boundsDict["Y"] ?? 0
             let cgW = boundsDict["Width"] ?? 0
             let cgH = boundsDict["Height"] ?? 0
             guard cgW > 10 && cgH > 10 else { continue }
 
-            // Convert CGWindow top-left origin to AppKit bottom-left origin
-            let screenH = NSScreen.screens.map { $0.frame.maxY }.max() ?? NSScreen.main?.frame.height ?? 0
             let appKitRect = NSRect(x: cgX, y: screenH - cgY - cgH, width: cgW, height: cgH)
-
             if appKitRect.contains(screenPoint) {
-                // Convert from global screen coords to this view's local coords
-                guard let viewWindow = self.window else { return nil }
-                let windowOrigin = viewWindow.frame.origin
                 let viewRect = NSRect(
                     x: appKitRect.origin.x - windowOrigin.x,
                     y: appKitRect.origin.y - windowOrigin.y,
                     width: appKitRect.width,
                     height: appKitRect.height
                 )
-                // Clamp to view bounds
-                return viewRect.intersection(bounds)
+                return viewRect.intersection(viewBounds)
             }
         }
         return nil
@@ -3168,6 +3394,12 @@ class OverlayView: NSView {
 
         // Color picker swatch selection
         if showColorPicker {
+            // Check opacity slider drag start
+            if opacitySliderRect.contains(point) {
+                isDraggingOpacitySlider = true
+                updateOpacityFromPoint(point)
+                return
+            }
             // Check HSB gradient drag start
             if showCustomColorPicker && customPickerGradientRect.contains(point) {
                 isDraggingHSBGradient = true
@@ -3528,6 +3760,7 @@ class OverlayView: NSView {
             guard !isRecording && !isDetached else { return }
             showToolbars = false
             annotations.removeAll()
+            undoStack.removeAll()
             redoStack.removeAll()
             numberCounter = 0
             bottomBarDragOffset = .zero
@@ -3580,6 +3813,11 @@ class OverlayView: NSView {
             return
         }
 
+        // Handle opacity slider dragging
+        if isDraggingOpacitySlider {
+            updateOpacityFromPoint(point)
+            return
+        }
         // Handle HSB gradient dragging
         if isDraggingHSBGradient {
             let color = colorFromHSBGradient(at: point)
@@ -3722,6 +3960,10 @@ class OverlayView: NSView {
             isDraggingRightBar = false
             return
         }
+        if isDraggingOpacitySlider {
+            isDraggingOpacitySlider = false
+            return
+        }
         if isDraggingHSBGradient {
             isDraggingHSBGradient = false
             return
@@ -3736,13 +3978,17 @@ class OverlayView: NSView {
             if let ann = selectedAnnotation, ann.tool == .loupe {
                 ann.bakeLoupe()
             }
+            // If this resize was initiated via hover-to-move (not the select tool), clear selectedAnnotation
+            if currentTool != .select {
+                selectedAnnotation = nil
+            }
             needsDisplay = true
             return
         }
         lastDragPoint = nil
         switch state {
         case .selecting:
-            if selectionRect.width > 5 && selectionRect.height > 5 {
+            if selectionRect.width > 5 || selectionRect.height > 5 {
                 // Real drag — use drawn rect as-is
                 state = .selected
                 showToolbars = true
@@ -3769,6 +4015,10 @@ class OverlayView: NSView {
                 isDraggingAnnotation = false
                 if let ann = selectedAnnotation, ann.tool == .loupe {
                     ann.bakeLoupe()
+                }
+                // If this drag was initiated via hover-to-move (not the select tool), clear selectedAnnotation
+                if currentTool != .select {
+                    selectedAnnotation = nil
                 }
                 needsDisplay = true
             } else if isDraggingSelection {
@@ -3931,7 +4181,7 @@ class OverlayView: NSView {
         }
         guard isRightClickSelecting else { return }
         isRightClickSelecting = false
-        if selectionRect.width > 5 && selectionRect.height > 5 {
+        if selectionRect.width > 5 || selectionRect.height > 5 {
             // Real drag — use drawn rect
             state = .selected
             overlayDelegate?.overlayViewDidRequestQuickSave()
@@ -4226,22 +4476,41 @@ class OverlayView: NSView {
         needsDisplay = true
     }
 
+    private func updateOpacityFromPoint(_ point: NSPoint) {
+        currentColorOpacity = max(0.05, min(1, (point.x - opacitySliderRect.minX) / opacitySliderRect.width))
+        OverlayView.lastUsedOpacity = currentColorOpacity
+        applyColorToSelectedAnnotation()
+        needsDisplay = true
+    }
+
     private func applyColorToTextIfEditing() {
         if let tv = textEditView {
+            let textColor = annotationColor
             let range = selectedOrAllRange()
             if range.length > 0 {
-                tv.textStorage?.addAttribute(.foregroundColor, value: currentColor, range: range)
+                tv.textStorage?.addAttribute(.foregroundColor, value: textColor, range: range)
             }
-            tv.insertionPointColor = currentColor
-            tv.typingAttributes[.foregroundColor] = currentColor
+            tv.insertionPointColor = textColor
+            tv.typingAttributes[.foregroundColor] = textColor
         }
     }
 
     private func applyColorToSelectedAnnotation() {
         guard let ann = selectedAnnotation else { return }
-        ann.color = currentColor
+        ann.color = opacityApplied(for: ann.tool)
         cachedCompositedImage = nil
         needsDisplay = true
+    }
+
+    /// Returns currentColor with opacity applied for tools that respect it.
+    /// Marker uses a fixed alpha in its draw method; loupe/measure/pixelate/blur are color-independent.
+    private func opacityApplied(for tool: AnnotationTool) -> NSColor {
+        switch tool {
+        case .marker, .loupe, .measure, .pixelate, .blur, .translateOverlay:
+            return currentColor
+        default:
+            return annotationColor
+        }
     }
 
     // MARK: - Annotation Creation
@@ -4255,7 +4524,11 @@ class OverlayView: NSView {
             if let selected = selectedAnnotation {
                 // Delete button
                 if annotationDeleteButtonRect.contains(point) {
-                    annotations.removeAll { $0 === selected }
+                    if let idx = annotations.firstIndex(where: { $0 === selected }) {
+                        annotations.remove(at: idx)
+                        undoStack.append(.deleted(selected, idx))
+                        redoStack.removeAll()
+                    }
                     selectedAnnotation = nil
                     needsDisplay = true
                     return
@@ -4308,6 +4581,52 @@ class OverlayView: NSView {
             return
         }
 
+        // Hover-to-move: if the cursor is over a hovered annotation (while a drawing tool is active),
+        // intercept the click and handle it like the select tool — resize handle or drag — without
+        // switching currentTool.
+        if let hovered = hoveredAnnotation {
+            // Check resize handles of the hovered annotation (populated by drawAnnotationControls)
+            for (handle, rect) in annotationResizeHandleRects {
+                if rect.insetBy(dx: -4, dy: -4).contains(point) {
+                    selectedAnnotation = hovered
+                    isResizingAnnotation = true
+                    annotationResizeHandle = handle
+                    annotationResizeOrigStart = hovered.startPoint
+                    annotationResizeOrigEnd = hovered.endPoint
+                    annotationResizeOrigTextOrigin = hovered.textDrawRect.origin
+                    annotationResizeMouseStart = point
+                    if handle == .top {
+                        annotationResizeOrigControlPoint = hovered.controlPoint ?? NSPoint(
+                            x: (hovered.startPoint.x + hovered.endPoint.x) / 2,
+                            y: (hovered.startPoint.y + hovered.endPoint.y) / 2
+                        )
+                    }
+                    needsDisplay = true
+                    return
+                }
+            }
+            // Check delete button
+            if annotationDeleteButtonRect.contains(point) {
+                if let idx = annotations.firstIndex(where: { $0 === hovered }) {
+                    annotations.remove(at: idx)
+                    undoStack.append(.deleted(hovered, idx))
+                    redoStack.removeAll()
+                }
+                hoveredAnnotation = nil
+                selectedAnnotation = nil
+                needsDisplay = true
+                return
+            }
+            // Click on the annotation body — start drag
+            if hovered.hitTest(point: point) {
+                selectedAnnotation = hovered
+                isDraggingAnnotation = true
+                annotationDragStart = point
+                needsDisplay = true
+                return
+            }
+        }
+
         // Loupe: click to place
         if currentTool == .loupe {
             let size = currentLoupeSize
@@ -4322,6 +4641,7 @@ class OverlayView: NSView {
             loupeAnnotation.sourceImageBounds = bounds
             loupeAnnotation.bakeLoupe()
             annotations.append(loupeAnnotation)
+            undoStack.append(.added(loupeAnnotation))
             redoStack.removeAll()
             needsDisplay = true
             return
@@ -4336,9 +4656,10 @@ class OverlayView: NSView {
             return
         case .number:
             numberCounter += 1
-            let annotation = Annotation(tool: .number, startPoint: point, endPoint: point, color: currentColor, strokeWidth: currentNumberSize)
+            let annotation = Annotation(tool: .number, startPoint: point, endPoint: point, color: opacityApplied(for: .number), strokeWidth: currentNumberSize)
             annotation.number = numberCounter
             annotations.append(annotation)
+            undoStack.append(.added(annotation))
             redoStack.removeAll()
             needsDisplay = true
             return
@@ -4347,7 +4668,7 @@ class OverlayView: NSView {
         }
 
         let toolStroke: CGFloat = currentTool == .marker ? currentMarkerSize : currentStrokeWidth
-        let annotation = Annotation(tool: currentTool, startPoint: point, endPoint: point, color: currentColor, strokeWidth: toolStroke)
+        let annotation = Annotation(tool: currentTool, startPoint: point, endPoint: point, color: opacityApplied(for: currentTool), strokeWidth: toolStroke)
         if currentTool == .pencil || currentTool == .marker {
             annotation.points = [point]
         }
@@ -4413,11 +4734,13 @@ class OverlayView: NSView {
                 }
                 annotation.bakePixelate()  // no-op for non-pixelate tools
                 annotations.append(annotation)
+                undoStack.append(.added(annotation))
                 redoStack.removeAll()
             }
         } else if dx > 2 || dy > 2 {
             annotation.bakePixelate()  // bake pixelate result and release screenshot ref
             annotations.append(annotation)
+            undoStack.append(.added(annotation))
             redoStack.removeAll()
         }
         currentAnnotation = nil
@@ -4798,7 +5121,7 @@ class OverlayView: NSView {
             let annotation = Annotation(tool: .text,
                                         startPoint: sv.frame.origin,
                                         endPoint: NSPoint(x: sv.frame.maxX, y: sv.frame.maxY),
-                                        color: currentColor,
+                                        color: opacityApplied(for: .text),
                                         strokeWidth: currentStrokeWidth)
             annotation.attributedText = attrStr
             annotation.text = text
@@ -4810,6 +5133,7 @@ class OverlayView: NSView {
             annotation.textImage = img
             annotation.textDrawRect = sv.frame
             annotations.append(annotation)
+            undoStack.append(.added(annotation))
             redoStack.removeAll()
         }
         sv.removeFromSuperview()
@@ -4884,6 +5208,29 @@ class OverlayView: NSView {
             if textEditView == nil, state == .selected {
                 overlayDelegate?.overlayViewDidConfirm()
             }
+        case 51: // Backspace/Delete — remove selected or hovered annotation
+            guard textEditView == nil, state == .selected else { break }
+            if let ann = selectedAnnotation {
+                if let idx = annotations.firstIndex(where: { $0 === ann }) {
+                    annotations.remove(at: idx)
+                    undoStack.append(.deleted(ann, idx))
+                    redoStack.removeAll()
+                }
+                selectedAnnotation = nil
+                cachedCompositedImage = nil
+                needsDisplay = true
+            } else if let ann = hoveredAnnotation {
+                if let idx = annotations.firstIndex(where: { $0 === ann }) {
+                    annotations.remove(at: idx)
+                    undoStack.append(.deleted(ann, idx))
+                    redoStack.removeAll()
+                }
+                hoveredAnnotation = nil
+                hoveredAnnotationClearTimer?.invalidate()
+                hoveredAnnotationClearTimer = nil
+                cachedCompositedImage = nil
+                needsDisplay = true
+            }
         default:
             if event.modifierFlags.contains(.command) {
                 if event.charactersIgnoringModifiers == "z" {
@@ -4922,39 +5269,76 @@ class OverlayView: NSView {
     // MARK: - Undo/Redo
 
     func undo() {
-        guard let last = annotations.last else { return }
-        if let groupID = last.groupID {
-            // Batch undo: remove all annotations with the same groupID
-            var removed: [Annotation] = []
-            while let ann = annotations.last, ann.groupID == groupID {
-                annotations.removeLast()
-                removed.append(ann)
+        guard let entry = undoStack.last else { return }
+        undoStack.removeLast()
+        switch entry {
+        case .added(let ann):
+            // Undo an addition — handle batch (groupID) or single
+            if let groupID = ann.groupID {
+                var batch: [UndoEntry] = [.added(ann)]
+                while let prev = undoStack.last, prev.annotation.groupID == groupID {
+                    undoStack.removeLast()
+                    batch.append(prev)
+                }
+                for e in batch { annotations.removeAll { $0 === e.annotation } }
+                if ann.tool == .number { numberCounter = max(0, numberCounter - batch.count) }
+                redoStack.append(contentsOf: batch)
+                clearHoverIfNeeded(batch.map { $0.annotation })
+            } else {
+                annotations.removeAll { $0 === ann }
                 if ann.tool == .number { numberCounter = max(0, numberCounter - 1) }
+                redoStack.append(.added(ann))
+                clearHoverIfNeeded([ann])
             }
-            redoStack.append(contentsOf: removed)
-        } else {
-            annotations.removeLast()
-            redoStack.append(last)
-            if last.tool == .number { numberCounter = max(0, numberCounter - 1) }
+        case .deleted(let ann, let idx):
+            // Undo a deletion — re-insert at original position
+            let safeIdx = min(idx, annotations.count)
+            annotations.insert(ann, at: safeIdx)
+            if ann.tool == .number { numberCounter += 1 }
+            redoStack.append(.deleted(ann, idx))
         }
         needsDisplay = true
     }
 
+    private func clearHoverIfNeeded(_ removed: [Annotation]) {
+        var changed = false
+        if let h = hoveredAnnotation, removed.contains(where: { $0 === h }) {
+            hoveredAnnotationClearTimer?.invalidate()
+            hoveredAnnotationClearTimer = nil
+            hoveredAnnotation = nil
+            changed = true
+        }
+        if let s = selectedAnnotation, removed.contains(where: { $0 === s }) {
+            selectedAnnotation = nil
+            changed = true
+        }
+        if changed { window?.invalidateCursorRects(for: self) }
+    }
+
     func redo() {
-        guard let last = redoStack.last else { return }
-        if let groupID = last.groupID {
-            // Batch redo: restore all annotations with the same groupID
-            var restored: [Annotation] = []
-            while let ann = redoStack.last, ann.groupID == groupID {
-                redoStack.removeLast()
-                restored.append(ann)
+        guard let entry = redoStack.last else { return }
+        redoStack.removeLast()
+        switch entry {
+        case .added(let ann):
+            if let groupID = ann.groupID {
+                var batch: [UndoEntry] = [.added(ann)]
+                while let next = redoStack.last, next.annotation.groupID == groupID {
+                    redoStack.removeLast()
+                    batch.append(next)
+                }
+                for e in batch { annotations.append(e.annotation) }
+                if ann.tool == .number { numberCounter += batch.count }
+                undoStack.append(contentsOf: batch)
+            } else {
+                annotations.append(ann)
                 if ann.tool == .number { numberCounter += 1 }
+                undoStack.append(.added(ann))
             }
-            annotations.append(contentsOf: restored)
-        } else {
-            redoStack.removeLast()
-            annotations.append(last)
-            if last.tool == .number { numberCounter += 1 }
+        case .deleted(let ann, let idx):
+            // Redo a deletion — remove again
+            annotations.removeAll { $0 === ann }
+            if ann.tool == .number { numberCounter = max(0, numberCounter - 1) }
+            undoStack.append(.deleted(ann, idx))
         }
         needsDisplay = true
     }
@@ -5110,6 +5494,7 @@ class OverlayView: NSView {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self, !redactAnnotations.isEmpty else { return }
                 self.annotations.append(contentsOf: redactAnnotations)
+                self.undoStack.append(contentsOf: redactAnnotations.map { .added($0) })
                 self.redoStack.removeAll()
                 self.needsDisplay = true
             }
@@ -5322,6 +5707,7 @@ class OverlayView: NSView {
 
                     self.annotations.removeAll { $0.tool == .translateOverlay }
                     self.annotations.append(contentsOf: newAnnotations)
+                    self.undoStack.append(contentsOf: newAnnotations.map { .added($0) })
                     self.redoStack.removeAll()
                     self.needsDisplay = true
                 }
@@ -5440,6 +5826,7 @@ class OverlayView: NSView {
             screenshotImage: screenshotImage,
             selectionRect: selectionRect,
             annotations: annotations,
+            undoStack: undoStack,
             redoStack: redoStack,
             currentTool: currentTool,
             currentColor: currentColor,
@@ -5459,9 +5846,11 @@ class OverlayView: NSView {
         // Translate annotations so they're relative to the new (0,0) origin
         if offset != .zero {
             for ann in s.annotations { ann.move(dx: -offset.x, dy: -offset.y) }
-            for ann in s.redoStack   { ann.move(dx: -offset.x, dy: -offset.y) }
+            for entry in s.undoStack { entry.annotation.move(dx: -offset.x, dy: -offset.y) }
+            for entry in s.redoStack { entry.annotation.move(dx: -offset.x, dy: -offset.y) }
         }
         annotations = s.annotations
+        undoStack = s.undoStack
         redoStack = s.redoStack
         currentTool = s.currentTool
         currentColor = s.currentColor
@@ -5488,6 +5877,7 @@ class OverlayView: NSView {
         state = .idle
         selectionRect = .zero
         annotations.removeAll()
+        undoStack.removeAll()
         redoStack.removeAll()
         currentAnnotation = nil
         numberCounter = 0
@@ -5511,6 +5901,9 @@ class OverlayView: NSView {
         selectedAnnotation = nil
         isDraggingAnnotation = false
         toolBeforeSelect = nil
+        hoveredAnnotationClearTimer?.invalidate()
+        hoveredAnnotationClearTimer = nil
+        hoveredAnnotation = nil
         showColorWheel = false
         isRightClickSelecting = false
         delaySeconds = UserDefaults.standard.integer(forKey: "lastDelaySeconds")
@@ -5529,6 +5922,7 @@ class OverlayView: NSView {
         customHSBCachedImage = nil
         isDraggingHSBGradient = false
         isDraggingBrightnessSlider = false
+        isDraggingOpacitySlider = false
         isDraggingBottomBar = false
         isDraggingRightBar = false
         bottomBarDragOffset = .zero

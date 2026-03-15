@@ -7,7 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var preferencesController: PreferencesWindowController?
     private var onboardingController: PermissionOnboardingController?
     private var pinControllers: [PinWindowController] = []
-    private var thumbnailController: FloatingThumbnailController?
+    private var thumbnailControllers: [FloatingThumbnailController] = []
     private var ocrController: OCRResultController?
     private var historyMenu: NSMenu?
     private var isCapturing = false
@@ -144,10 +144,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard !isCapturing else { return }
         isCapturing = true
 
-        // Dismiss any existing thumbnail
-        thumbnailController?.dismiss()
-        thumbnailController = nil
-
         dismissOverlays()
 
         if fromMenu {
@@ -176,6 +172,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 controller.showOverlay()
                 self.overlayControllers.append(controller)
             }
+            self.restoreLastSelectionIfNeeded(controllers: self.overlayControllers)
+        }
+    }
+
+    private func restoreLastSelectionIfNeeded(controllers: [OverlayWindowController]) {
+        guard UserDefaults.standard.bool(forKey: "rememberLastSelection") else { return }
+        guard let rectStr = UserDefaults.standard.string(forKey: "lastSelectionRect"),
+              let screenStr = UserDefaults.standard.string(forKey: "lastSelectionScreenFrame") else { return }
+        let savedRect = NSRectFromString(rectStr)
+        let savedScreenFrame = NSRectFromString(screenStr)
+        guard savedRect.width > 1, savedRect.height > 1 else { return }
+        // Apply to the controller whose screen matches the saved screen frame
+        for controller in controllers where controller.screen.frame == savedScreenFrame {
+            controller.applySelection(savedRect)
+            break
         }
     }
 
@@ -193,13 +204,105 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let enabled = UserDefaults.standard.object(forKey: "showFloatingThumbnail") as? Bool ?? true
         guard enabled else { return }
 
-        thumbnailController?.dismiss()
+        let stacking = UserDefaults.standard.object(forKey: "thumbnailStacking") as? Bool ?? true
+        if !stacking {
+            // Replace mode: dismiss all existing thumbnails
+            thumbnailControllers.forEach { $0.dismiss() }
+            thumbnailControllers.removeAll()
+        }
+
+        let screen = NSScreen.main ?? NSScreen.screens[0]
+        let screenFrame = screen.visibleFrame
+        let padding: CGFloat = 16
+        let gap: CGFloat = 8
+
+        // Compute Y: stack above any existing thumbnails
+        var yOrigin = screenFrame.minY + padding
+        if let topController = thumbnailControllers.last {
+            let topFrame = topController.windowFrame
+            yOrigin = topFrame.maxY + gap
+        }
+
         let controller = FloatingThumbnailController(image: image)
         controller.onDismiss = { [weak self] in
-            self?.thumbnailController = nil
+            self?.thumbnailControllers.removeAll { $0 === controller }
+            self?.reflowThumbnails()
         }
-        thumbnailController = controller
-        controller.show()
+        controller.onCopy = { [weak self] in
+            guard let self = self else { return }
+            let autoCopy = UserDefaults.standard.object(forKey: "autoCopyToClipboard") as? Bool ?? true
+            if autoCopy { ImageEncoder.copyToClipboard(image) }
+            self.playCopySound()
+        }
+        controller.onSave = { [weak self] in
+            guard let self = self else { return }
+            self.saveImageToFile(image)
+        }
+        controller.onPin = { [weak self] in
+            guard let self = self else { return }
+            ScreenshotHistory.shared.add(image: image)
+            self.showPin(image: image)
+            self.playCopySound()
+        }
+        controller.onEdit = { [weak self] in
+            guard let self = self else { return }
+            let state = OverlayEditorState(
+                screenshotImage: image,
+                selectionRect: NSRect(origin: .zero, size: image.size),
+                annotations: [], undoStack: [], redoStack: [],
+                currentTool: .arrow, currentColor: .systemRed,
+                currentStrokeWidth: 3, currentMarkerSize: 3,
+                currentNumberSize: 3, numberCounter: 0,
+                beautifyEnabled: false, beautifyStyleIndex: 0
+            )
+            DetachedEditorWindowController.open(with: state, offset: .zero)
+        }
+        controller.onUpload = { [weak self] in
+            guard let self = self else { return }
+            ScreenshotHistory.shared.add(image: image)
+            self.showUploadProgress(image: image)
+        }
+        thumbnailControllers.append(controller)
+        controller.show(atY: yOrigin)
+    }
+
+    private func reflowThumbnails() {
+        let screen = NSScreen.main ?? NSScreen.screens[0]
+        let padding: CGFloat = 16
+        let gap: CGFloat = 8
+        var y = screen.visibleFrame.minY + padding
+        for c in thumbnailControllers {
+            let h = c.windowFrame.height  // height doesn't change, only Y moves
+            c.moveTo(y: y)
+            y += h + gap
+        }
+    }
+
+    private func playCopySound() {
+        let soundEnabled = UserDefaults.standard.object(forKey: "playCopySound") as? Bool ?? true
+        guard soundEnabled else { return }
+        let path = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif"
+        let sound = NSSound(contentsOfFile: path, byReference: true) ?? NSSound(named: "Tink")
+        sound?.stop()
+        sound?.play()
+    }
+
+    private func saveImageToFile(_ image: NSImage) {
+        guard let imageData = ImageEncoder.encode(image) else { return }
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [ImageEncoder.utType]
+        savePanel.nameFieldStringValue = "macshot_\(OverlayWindowController.formattedTimestamp()).\(ImageEncoder.fileExtension)"
+        if let savedPath = UserDefaults.standard.string(forKey: "saveDirectory") {
+            savePanel.directoryURL = URL(fileURLWithPath: savedPath)
+        } else {
+            savePanel.directoryURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
+        }
+        savePanel.begin { response in
+            if response == .OK, let url = savePanel.url {
+                try? imageData.write(to: url)
+                UserDefaults.standard.set(url.deletingLastPathComponent().path, forKey: "saveDirectory")
+            }
+        }
     }
 
     // MARK: - Upload

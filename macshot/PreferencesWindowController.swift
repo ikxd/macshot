@@ -9,7 +9,11 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate {
     private var savePathField: NSTextField!
     private var autoCopyCheckbox: NSButton!
     private var copySoundCheckbox: NSButton!
+    private var rememberSelectionCheckbox: NSButton!
     private var thumbnailCheckbox: NSButton!
+    private var thumbnailAutoDismissStepper: NSStepper!
+    private var thumbnailAutoDismissField: NSTextField!
+    private var thumbnailStackingPopup: NSPopUpButton!
     private var launchAtLoginCheckbox: NSButton!
     private var historySizeField: NSTextField!
     private var historySizeStepper: NSStepper!
@@ -186,13 +190,47 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate {
         // Checkboxes
         autoCopyCheckbox = NSButton(checkboxWithTitle: "Auto-copy to clipboard on confirm", target: self, action: #selector(autoCopyChanged(_:)))
         copySoundCheckbox = NSButton(checkboxWithTitle: "Play sound on copy", target: self, action: #selector(copySoundChanged(_:)))
+        rememberSelectionCheckbox = NSButton(checkboxWithTitle: "Remember last selection area", target: self, action: #selector(rememberSelectionChanged(_:)))
         thumbnailCheckbox = NSButton(checkboxWithTitle: "Show floating thumbnail after capture", target: self, action: #selector(thumbnailChanged(_:)))
         launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: self, action: #selector(launchAtLoginChanged(_:)))
 
-        for cb in [autoCopyCheckbox!, copySoundCheckbox!, thumbnailCheckbox!, launchAtLoginCheckbox!] {
+        for cb in [autoCopyCheckbox!, copySoundCheckbox!, rememberSelectionCheckbox!, thumbnailCheckbox!] {
             stack.addArrangedSubview(indented(cb))
             stack.setCustomSpacing(6, after: stack.arrangedSubviews.last!)
         }
+
+        // Thumbnail auto-dismiss stepper
+        thumbnailAutoDismissField = NSTextField()
+        thumbnailAutoDismissField.isEditable = false
+        thumbnailAutoDismissField.isSelectable = false
+        thumbnailAutoDismissField.alignment = .center
+        thumbnailAutoDismissField.widthAnchor.constraint(equalToConstant: 40).isActive = true
+
+        thumbnailAutoDismissStepper = NSStepper()
+        thumbnailAutoDismissStepper.minValue = 0
+        thumbnailAutoDismissStepper.maxValue = 60
+        thumbnailAutoDismissStepper.increment = 1
+        thumbnailAutoDismissStepper.target = self
+        thumbnailAutoDismissStepper.action = #selector(thumbnailAutoDismissChanged(_:))
+
+        let dismissNote = NSTextField(labelWithString: "seconds before auto-dismiss (0 = never)")
+        dismissNote.font = NSFont.systemFont(ofSize: 11)
+        dismissNote.textColor = .secondaryLabelColor
+
+        stack.addArrangedSubview(indented(labeledRow("  Dismiss after:", controls: [thumbnailAutoDismissField!, thumbnailAutoDismissStepper!, dismissNote])))
+        stack.setCustomSpacing(6, after: stack.arrangedSubviews.last!)
+
+        // Thumbnail stacking popup
+        thumbnailStackingPopup = NSPopUpButton()
+        thumbnailStackingPopup.addItems(withTitles: ["Stack (keep all)", "Replace (show only latest)"])
+        thumbnailStackingPopup.target = self
+        thumbnailStackingPopup.action = #selector(thumbnailStackingChanged(_:))
+
+        stack.addArrangedSubview(indented(labeledRow("  Multiple previews:", controls: [thumbnailStackingPopup!])))
+        stack.setCustomSpacing(8, after: stack.arrangedSubviews.last!)
+
+        stack.addArrangedSubview(indented(launchAtLoginCheckbox))
+        stack.setCustomSpacing(6, after: stack.arrangedSubviews.last!)
 
         stack.setCustomSpacing(20, after: stack.arrangedSubviews.last!)
 
@@ -682,8 +720,17 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate {
         let copySound = UserDefaults.standard.object(forKey: "playCopySound") as? Bool ?? true
         copySoundCheckbox.state = copySound ? .on : .off
 
+        rememberSelectionCheckbox.state = UserDefaults.standard.bool(forKey: "rememberLastSelection") ? .on : .off
+
         let thumbnail = UserDefaults.standard.object(forKey: "showFloatingThumbnail") as? Bool ?? true
         thumbnailCheckbox.state = thumbnail ? .on : .off
+
+        let autoDismiss = UserDefaults.standard.object(forKey: "thumbnailAutoDismiss") as? Int ?? 5
+        thumbnailAutoDismissField.integerValue = autoDismiss
+        thumbnailAutoDismissStepper.integerValue = autoDismiss
+
+        let stacking = UserDefaults.standard.object(forKey: "thumbnailStacking") as? Bool ?? true
+        thumbnailStackingPopup.selectItem(at: stacking ? 0 : 1)
 
         let launchAtLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
         launchAtLoginCheckbox.state = launchAtLogin ? .on : .off
@@ -779,8 +826,18 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate {
     @objc private func copySoundChanged(_ sender: NSButton) {
         UserDefaults.standard.set(sender.state == .on, forKey: "playCopySound")
     }
+    @objc private func rememberSelectionChanged(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: "rememberLastSelection")
+    }
     @objc private func thumbnailChanged(_ sender: NSButton) {
         UserDefaults.standard.set(sender.state == .on, forKey: "showFloatingThumbnail")
+    }
+    @objc private func thumbnailAutoDismissChanged(_ sender: NSStepper) {
+        thumbnailAutoDismissField.integerValue = sender.integerValue
+        UserDefaults.standard.set(sender.integerValue, forKey: "thumbnailAutoDismiss")
+    }
+    @objc private func thumbnailStackingChanged(_ sender: NSPopUpButton) {
+        UserDefaults.standard.set(sender.indexOfSelectedItem == 0, forKey: "thumbnailStacking")
     }
     @objc private func quickModeChanged(_ sender: NSPopUpButton) {
         UserDefaults.standard.set(sender.indexOfSelectedItem == 1, forKey: "quickModeCopyToClipboard")
