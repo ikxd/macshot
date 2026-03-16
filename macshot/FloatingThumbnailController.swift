@@ -26,20 +26,28 @@ class FloatingThumbnailController: NSObject, NSDraggingSource {
         let screen = NSScreen.main ?? NSScreen.screens[0]
         let screenFrame = screen.visibleFrame
 
-        // 2× size: max 320px wide, maintain aspect ratio
+        // Max 320px wide, maintain aspect ratio, cap height to screen
         let maxWidth: CGFloat = 320
-        let scale = min(1.0, maxWidth / image.size.width)
+        let padding: CGFloat = 16
+        let maxHeight: CGFloat = screenFrame.height - padding * 2
+
+        let widthScale  = min(1.0, maxWidth  / image.size.width)
+        let heightScale = min(1.0, maxHeight / (image.size.height * widthScale)) // cap if tall
+        let scale = widthScale * heightScale
         let thumbSize = NSSize(
             width:  max(200, image.size.width  * scale),
             height: max(120, image.size.height * scale)
         )
-        let padding: CGFloat = 16
+
+        // Clamp Y so the thumbnail always fits within the visible screen
+        let clampedY = min(y, screenFrame.maxY - thumbSize.height - padding)
+        let finalY   = max(screenFrame.minY + padding, clampedY)
 
         let finalX = screenFrame.maxX - thumbSize.width - padding
         let startX = screenFrame.maxX + 10
 
         let panel = NSPanel(
-            contentRect: NSRect(x: startX, y: y, width: thumbSize.width, height: thumbSize.height),
+            contentRect: NSRect(x: startX, y: finalY, width: thumbSize.width, height: thumbSize.height),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -74,7 +82,7 @@ class FloatingThumbnailController: NSObject, NSDraggingSource {
             ctx.duration = 0.3
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(
-                NSRect(x: finalX, y: y, width: thumbSize.width, height: thumbSize.height),
+                NSRect(x: finalX, y: finalY, width: thumbSize.width, height: thumbSize.height),
                 display: true
             )
         })
