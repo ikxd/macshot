@@ -32,7 +32,7 @@ enum UndoEntry {
     }
 }
 
-/// Snapshot of the mutable editor state used to transfer from overlay → detached window.
+/// Snapshot of the mutable editor state.
 struct OverlayEditorState {
     var screenshotImage: NSImage?
     var selectionRect: NSRect
@@ -55,16 +55,6 @@ class OverlayView: NSView {
 
     weak var overlayDelegate: OverlayViewDelegate?
 
-    /// When true: renders as a standalone editor (no dark overlay, no idle/selecting state, toolbars fixed outside image).
-    var isDetached: Bool = false
-    /// Toolbar strip sizes in detached mode — set by DetachedEditorWindowController to match its window padding.
-    var detachedRightPad: CGFloat = 52
-    var detachedBottomPad: CGFloat = 52
-    var detachedLeftPad: CGFloat = 52
-    var detachedTopPad: CGFloat = 36
-
-    // Hit rect for the reset-zoom button in the detached top bar
-    private var detachedResetZoomRect: NSRect = .zero
 
     var screenshotImage: NSImage? {
         didSet { needsDisplay = true }
@@ -88,7 +78,7 @@ class OverlayView: NSView {
     private var zoomFadingOut: Bool = false
     private var zoomLabelOpacity: CGFloat = 0.0
     private var zoomFadeTimer: Timer?
-    private var zoomMin: CGFloat { isDetached ? 0.1 : 1.0 }
+    private var zoomMin: CGFloat { 1.0 }
     private let zoomMax: CGFloat = 8.0
 
     // Selection
@@ -246,6 +236,8 @@ class OverlayView: NSView {
     }()
     private var loupeCursorPoint: NSPoint = .zero
     private var markerCursorPoint: NSPoint = .zero
+    private var colorSamplerPoint: NSPoint = .zero  // canvas space, for color picker tool
+    private var colorSamplerBitmap: NSBitmapImageRep?  // cached bitmap for fast pixel sampling
     private var cachedCompositedImage: NSImage? = nil  // invalidated when annotations change
     private var showLoupeSizePicker: Bool = false
     private var loupeSizePickerRect: NSRect = .zero
@@ -258,7 +250,7 @@ class OverlayView: NSView {
     private var isTranslating: Bool = false
     private var translateEnabled: Bool = false
 
-    // Crop tool state (detached mode only)
+    // Crop tool state
     private var isCropDragging: Bool = false
     private var cropDragStart: NSPoint = .zero
     private var cropDragRect: NSRect = .zero
@@ -528,14 +520,28 @@ class OverlayView: NSView {
             }
         }
 
-        // Track cursor for marker size preview circle
+        // Track cursor for marker size preview circle (canvas space so it scales with zoom)
         if state == .selected && currentTool == .marker {
-            if point != markerCursorPoint {
-                markerCursorPoint = point
+            let canvasPoint = viewToCanvas(point)
+            if canvasPoint != markerCursorPoint {
+                markerCursorPoint = canvasPoint
                 needsDisplay = true
             }
         } else if markerCursorPoint != .zero {
             markerCursorPoint = .zero
+            needsDisplay = true
+        }
+
+        // Track cursor for color sampler tool (canvas space)
+        if state == .selected && currentTool == .colorSampler {
+            let canvasPoint = viewToCanvas(point)
+            if canvasPoint != colorSamplerPoint {
+                colorSamplerPoint = canvasPoint
+                needsDisplay = true
+            }
+        } else if colorSamplerPoint != .zero {
+            colorSamplerPoint = .zero
+            colorSamplerBitmap = nil
             needsDisplay = true
         }
 
@@ -841,18 +847,8 @@ class OverlayView: NSView {
             }
         }
 
-        // Detached top bar cursors
-        if isDetached {
-            if detachedCropButtonRect != .zero {
-                addCursorRect(detachedCropButtonRect, cursor: .pointingHand)
-            }
-            if detachedResetZoomRect != .zero {
-                addCursorRect(detachedResetZoomRect, cursor: .pointingHand)
-            }
-        }
-
-        // Size label — pointer cursor to indicate clickable (overlay mode only)
-        if !isDetached && sizeLabelRect.width > 0 && sizeInputField == nil {
+        // Size label — pointer cursor to indicate clickable
+        if sizeLabelRect.width > 0 && sizeInputField == nil {
             addCursorRect(sizeLabelRect, cursor: .pointingHand)
         }
 
@@ -939,127 +935,6 @@ class OverlayView: NSView {
 
         window?.invalidateCursorRects(for: self)
 
-        // In detached mode the view IS the editor — selectionRect is the image area (set by applySelection),
-        // with toolbar strips sitting outside it in the remaining bounds.
-        if isDetached {
-            state = .selected
-            showToolbars = true
-
-            // Recompute image rect on every draw to handle window resizing.
-            selectionRect = NSRect(x: detachedLeftPad, y: detachedBottomPad,
-                                   width: max(1, bounds.width - detachedRightPad - detachedLeftPad),
-                                   height: max(1, bounds.height - detachedBottomPad - detachedTopPad))
-
-            // Fill the whole view with a neutral background so toolbar strips look clean
-            NSColor(white: 0.15, alpha: 1.0).setFill()
-            NSBezierPath(rect: bounds).fill()
-
-            // Checkerboard in the image area (visible when zoomed out past 1×)
-            drawCheckerboard(in: selectionRect)
-
-            context.saveGraphicsState()
-            // Clip drawing to the image rect
-            NSBezierPath(rect: selectionRect).setClip()
-            applyZoomTransform(to: context)
-
-            if let image = screenshotImage {
-                image.draw(in: selectionRect, from: .zero, operation: .copy, fraction: 1.0)
-            }
-            for annotation in annotations { annotation.draw(in: context) }
-            currentAnnotation?.draw(in: context)
-            if currentTool == .loupe && selectionRect.contains(loupeCursorPoint) && loupeCursorPoint != .zero {
-                drawLoupePreview(at: loupeCursorPoint)
-            }
-            if let selected = selectedAnnotation, currentTool == .select {
-                drawAnnotationControls(for: selected)
-            } else if let hovered = hoveredAnnotation, [AnnotationTool.pencil, .arrow, .line, .rectangle, .filledRectangle, .ellipse].contains(currentTool) {
-                drawAnnotationControls(for: hovered)
-            }
-            context.restoreGraphicsState()
-
-            // Marker cursor preview circle (detached mode)
-            if currentTool == .marker && markerCursorPoint != .zero && selectionRect.contains(markerCursorPoint) && currentAnnotation == nil {
-                drawMarkerCursorPreview(at: markerCursorPoint)
-            }
-
-            // Crop overlay: dim outside the crop rect, dashed border inside
-            if isCropDragging && cropDragRect.width > 2 && cropDragRect.height > 2 {
-                // Dim the image area outside cropDragRect
-                NSColor.black.withAlphaComponent(0.45).setFill()
-                // Top strip
-                NSBezierPath(rect: NSRect(x: selectionRect.minX, y: cropDragRect.maxY,
-                                          width: selectionRect.width,
-                                          height: selectionRect.maxY - cropDragRect.maxY)).fill()
-                // Bottom strip
-                NSBezierPath(rect: NSRect(x: selectionRect.minX, y: selectionRect.minY,
-                                          width: selectionRect.width,
-                                          height: cropDragRect.minY - selectionRect.minY)).fill()
-                // Left strip
-                NSBezierPath(rect: NSRect(x: selectionRect.minX, y: cropDragRect.minY,
-                                          width: cropDragRect.minX - selectionRect.minX,
-                                          height: cropDragRect.height)).fill()
-                // Right strip
-                NSBezierPath(rect: NSRect(x: cropDragRect.maxX, y: cropDragRect.minY,
-                                          width: selectionRect.maxX - cropDragRect.maxX,
-                                          height: cropDragRect.height)).fill()
-                // Dashed border around crop rect
-                let dashPath = NSBezierPath(rect: cropDragRect)
-                dashPath.lineWidth = 1.5
-                let pattern: [CGFloat] = [6, 4]
-                dashPath.setLineDash(pattern, count: 2, phase: 0)
-                NSColor.white.withAlphaComponent(0.9).setStroke()
-                dashPath.stroke()
-                // Corner handles
-                let hs: CGFloat = 6
-                let corners = [
-                    NSPoint(x: cropDragRect.minX, y: cropDragRect.minY),
-                    NSPoint(x: cropDragRect.maxX, y: cropDragRect.minY),
-                    NSPoint(x: cropDragRect.minX, y: cropDragRect.maxY),
-                    NSPoint(x: cropDragRect.maxX, y: cropDragRect.maxY),
-                ]
-                NSColor.white.setFill()
-                for c in corners {
-                    NSBezierPath(rect: NSRect(x: c.x - hs/2, y: c.y - hs/2, width: hs, height: hs)).fill()
-                }
-            }
-
-            drawDetachedTopBar()
-
-            rebuildToolbarLayout()
-            ToolbarLayout.drawToolbar(barRect: bottomBarRect, buttons: bottomButtons, selectionSize: selectionRect.size)
-            ToolbarLayout.drawToolbar(barRect: rightBarRect, buttons: rightButtons, selectionSize: nil)
-            if showColorPicker { drawColorPicker() }
-            if showBeautifyPicker { drawBeautifyPicker() }
-            if showStrokePicker { drawStrokePicker() }
-            if showLoupeSizePicker { drawLoupeSizePicker() }
-            if showDelayPicker { drawDelayPicker() }
-            if showUploadConfirmPicker { drawUploadConfirmPicker() }
-            if showRedactTypePicker { drawRedactTypePicker() }
-            if showTranslatePicker { drawTranslatePicker() }
-            drawHoveredTooltip()
-            if showColorWheel { drawColorWheel() }
-            if showUploadConfirmDialog { drawUploadConfirmDialog() }
-            drawBarcodeBar()
-            if let errorMsg = overlayErrorMessage {
-                let attrs: [NSAttributedString.Key: Any] = [
-                    .font: NSFont.systemFont(ofSize: 13, weight: .medium),
-                    .foregroundColor: NSColor.white,
-                ]
-                let str = errorMsg as NSString
-                let strSize = str.size(withAttributes: attrs)
-                let padding: CGFloat = 12
-                let msgW = strSize.width + padding * 2
-                let msgH = strSize.height + padding
-                let msgX = bounds.midX - msgW / 2
-                let msgY = bounds.maxY - msgH - 40
-                let msgRect = NSRect(x: msgX, y: msgY, width: msgW, height: msgH)
-                NSColor(red: 0.8, green: 0.2, blue: 0.2, alpha: 0.9).setFill()
-                NSBezierPath(roundedRect: msgRect, xRadius: 8, yRadius: 8).fill()
-                str.draw(at: NSPoint(x: msgRect.minX + padding, y: msgRect.minY + padding / 2), withAttributes: attrs)
-            }
-            return
-        }
-
         // During scroll capture: make the entire window transparent so the user sees
         // live screen content everywhere (not just inside the selection).
         if isScrollCapturing {
@@ -1095,19 +970,28 @@ class OverlayView: NSView {
                 context.restoreGraphicsState()
             }
 
-            // Clear area inside selection
+            // Draw screenshot clipped to selection (image never bleeds outside).
             context.saveGraphicsState()
             NSBezierPath(rect: selectionRect).setClip()
-
-            // Apply zoom transform — scales/pans content around the selection center
             applyZoomTransform(to: context)
-
             if !isScrollCapturing, !annotationModeEverUsed, let image = screenshotImage {
                 image.draw(in: bounds, from: .zero, operation: .copy, fraction: 1.0)
             }
+            context.restoreGraphicsState()
 
-            // Draw annotations clipped to selection
-            for annotation in annotations {
+            // Draw translate overlays clipped to selection (they must stay inside).
+            context.saveGraphicsState()
+            NSBezierPath(rect: selectionRect).setClip()
+            applyZoomTransform(to: context)
+            for annotation in annotations where annotation.tool == .translateOverlay {
+                annotation.draw(in: context)
+            }
+            context.restoreGraphicsState()
+
+            // Draw user annotations unclipped — strokes can continue past the selection border.
+            context.saveGraphicsState()
+            applyZoomTransform(to: context)
+            for annotation in annotations where annotation.tool != .translateOverlay {
                 annotation.draw(in: context)
             }
             currentAnnotation?.draw(in: context)
@@ -1115,6 +999,9 @@ class OverlayView: NSView {
             // Live loupe preview when loupe tool is active
             if currentTool == .loupe && selectionRect.contains(loupeCursorPoint) && loupeCursorPoint != .zero {
                 drawLoupePreview(at: loupeCursorPoint)
+            }
+            if currentTool == .colorSampler && colorSamplerPoint != .zero {
+                drawColorSamplerPreview(at: colorSamplerPoint)
             }
 
             // Draw selection highlight for selected annotation (or hovered annotation in drawing mode)
@@ -1127,12 +1014,12 @@ class OverlayView: NSView {
                 }
             }
 
-            context.restoreGraphicsState()
-
-            // Marker cursor preview circle
-            if currentTool == .marker && markerCursorPoint != .zero && selectionRect.contains(markerCursorPoint) && currentAnnotation == nil {
+            // Marker cursor preview inside zoom transform so it scales with zoom
+            if currentTool == .marker && markerCursorPoint != .zero && currentAnnotation == nil {
                 drawMarkerCursorPreview(at: markerCursorPoint)
             }
+
+            context.restoreGraphicsState()
 
             // Selection border — red during scroll capture, purple otherwise
             let borderPath = NSBezierPath(rect: selectionRect)
@@ -2464,6 +2351,108 @@ class OverlayView: NSView {
         }
     }
 
+    // MARK: - Color Sampler Preview
+
+    /// Sample the pixel color at `canvasPoint` from the screenshot and draw a live preview.
+    private func drawColorSamplerPreview(at canvasPoint: NSPoint) {
+        guard let screenshot = screenshotImage else { return }
+        guard let result = sampleColor(from: screenshot, at: canvasPoint) else { return }
+        let sampledColor = result.color
+        let hexStr = result.hex
+
+        guard let context = NSGraphicsContext.current else { return }
+        context.saveGraphicsState()
+
+        let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
+        let copyFont = NSFont.systemFont(ofSize: 10, weight: .regular)
+        let hexAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        let copyAttrs: [NSAttributedString.Key: Any] = [.font: copyFont, .foregroundColor: NSColor.white.withAlphaComponent(0.5)]
+
+        let hexSize = (hexStr as NSString).size(withAttributes: hexAttrs)
+        let copyText = "C to copy"
+        let copySize = (copyText as NSString).size(withAttributes: copyAttrs)
+
+        let swatchSize: CGFloat = 16
+        let padding: CGFloat = 8
+        let gap: CGFloat = 6
+        let labelW = padding + swatchSize + gap + max(hexSize.width, copySize.width) + padding
+        let labelH = padding + hexSize.height + 2 + copySize.height + padding
+
+        let labelX = canvasPoint.x + 16
+        let labelY = canvasPoint.y - labelH - 8
+        let labelRect = NSRect(x: labelX, y: labelY, width: labelW, height: labelH)
+
+        // Background pill
+        NSColor.black.withAlphaComponent(0.85).setFill()
+        NSBezierPath(roundedRect: labelRect, xRadius: 6, yRadius: 6).fill()
+
+        // Color swatch
+        let swatchRect = NSRect(x: labelRect.minX + padding,
+                                y: labelRect.midY - swatchSize / 2,
+                                width: swatchSize, height: swatchSize)
+        sampledColor.setFill()
+        NSBezierPath(roundedRect: swatchRect, xRadius: 3, yRadius: 3).fill()
+        NSColor.white.withAlphaComponent(0.4).setStroke()
+        let swatchBorder = NSBezierPath(roundedRect: swatchRect, xRadius: 3, yRadius: 3)
+        swatchBorder.lineWidth = 0.5
+        swatchBorder.stroke()
+
+        // Hex text + copy hint
+        let textX = swatchRect.maxX + gap
+        (hexStr as NSString).draw(at: NSPoint(x: textX, y: labelRect.maxY - padding - hexSize.height), withAttributes: hexAttrs)
+        (copyText as NSString).draw(at: NSPoint(x: textX, y: labelRect.minY + padding), withAttributes: copyAttrs)
+
+        context.restoreGraphicsState()
+    }
+
+    /// Sample a pixel color from the screenshot at the given canvas-space point.
+    /// Returns (NSColor for display, hex string with raw sRGB values matching what other tools report).
+    private func sampleColor(from image: NSImage, at canvasPoint: NSPoint) -> (color: NSColor, hex: String)? {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let imgSize = image.size
+
+        let px = canvasPoint.x * imgSize.width / bounds.width
+        let py = canvasPoint.y * imgSize.height / bounds.height
+        guard px >= 0, py >= 0, px < imgSize.width, py < imgSize.height else { return nil }
+
+        // Map to CGImage pixel coordinates.
+        let scaleX = CGFloat(cgImage.width) / imgSize.width
+        let scaleY = CGFloat(cgImage.height) / imgSize.height
+        let cgX = Int(px * scaleX)
+        let cgY = Int(CGFloat(cgImage.height) - 1 - py * scaleY)  // flip Y for CGImage (top-left origin)
+        guard cgX >= 0, cgX < cgImage.width, cgY >= 0, cgY < cgImage.height else { return nil }
+
+        // Render the single pixel into a known-format 1×1 sRGB bitmap to get correct raw values.
+        let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(data: nil, width: 1, height: 1,
+                                  bitsPerComponent: 8, bytesPerRow: 4,
+                                  space: srgb,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.draw(cgImage, in: CGRect(x: -CGFloat(cgX), y: -(CGFloat(cgImage.height) - 1 - CGFloat(cgY)),
+                                     width: CGFloat(cgImage.width), height: CGFloat(cgImage.height)))
+        guard let data = ctx.data else { return nil }
+        let ptr = data.assumingMemoryBound(to: UInt8.self)
+        let a = CGFloat(ptr[3]) / 255
+        guard a > 0 else { return nil }
+        // Undo premultiplication
+        let r = UInt8(min(255, CGFloat(ptr[0]) / a))
+        let g = UInt8(min(255, CGFloat(ptr[1]) / a))
+        let b = UInt8(min(255, CGFloat(ptr[2]) / a))
+
+        let hex = String(format: "#%02X%02X%02X", r, g, b)
+        let color = NSColor(srgbRed: CGFloat(r)/255, green: CGFloat(g)/255, blue: CGFloat(b)/255, alpha: 1)
+        return (color, hex)
+    }
+
+    private func copyColorAtSamplerPoint() {
+        guard let screenshot = screenshotImage,
+              let result = sampleColor(from: screenshot, at: colorSamplerPoint) else { return }
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(result.hex, forType: .string)
+        showOverlayError("Copied \(result.hex)")
+    }
+
     // MARK: - Marker Cursor Preview
 
     private func drawMarkerCursorPreview(at center: NSPoint) {
@@ -2482,126 +2471,34 @@ class OverlayView: NSView {
     // MARK: - Loupe Preview
 
     private func drawLoupePreview(at center: NSPoint) {
-        guard screenshotImage != nil else { return }
+        guard let screenshot = screenshotImage, let context = NSGraphicsContext.current else { return }
         let size = currentLoupeSize
-        let loupeRect = NSRect(x: center.x - size/2, y: center.y - size/2, width: size, height: size)
+        let squareRect = NSRect(x: center.x - size/2, y: center.y - size/2, width: size, height: size)
+        let magnification: CGFloat = 2.0
 
-        let previewAnn = Annotation(tool: .loupe, startPoint: loupeRect.origin,
-                                     endPoint: NSPoint(x: loupeRect.maxX, y: loupeRect.maxY),
-                                     color: .white, strokeWidth: 2)
-        previewAnn.sourceImage = compositedImage()
-        previewAnn.sourceImageBounds = bounds
-
-        guard let context = NSGraphicsContext.current else { return }
         context.saveGraphicsState()
-        NSGraphicsContext.current?.cgContext.setAlpha(0.75)
-        previewAnn.draw(in: context)
+        context.cgContext.setAlpha(0.75)
+
+        // Clip to circle
+        let path = NSBezierPath(ovalIn: squareRect)
+        path.addClip()
+
+        // Draw magnified region directly from screenshot (no intermediate image)
+        let srcSize = size / magnification
+        let srcRect = NSRect(x: center.x - srcSize/2, y: center.y - srcSize/2, width: srcSize, height: srcSize)
+        let imgSize = screenshot.size
+        let scaleX = imgSize.width / bounds.width
+        let scaleY = imgSize.height / bounds.height
+        let fromRect = NSRect(x: srcRect.origin.x * scaleX, y: srcRect.origin.y * scaleY,
+                              width: srcRect.width * scaleX, height: srcRect.height * scaleY)
+        screenshot.draw(in: squareRect, from: fromRect, operation: .copy, fraction: 1.0)
+
+        // Simple border
+        NSColor.white.withAlphaComponent(0.6).setStroke()
+        path.lineWidth = 3
+        path.stroke()
+
         context.restoreGraphicsState()
-    }
-
-    // MARK: - Detached top bar
-
-    // Rects for detached top-bar interactive elements
-    private var detachedCropButtonRect: NSRect = .zero
-    // detachedZoomLabelRect reuses the shared zoomLabelRect
-
-    private func drawDetachedTopBar() {
-        let barY = bounds.maxY - detachedTopPad
-        let barRect = NSRect(x: 0, y: barY, width: bounds.width, height: detachedTopPad)
-
-        // Subtle separator line at the bottom of the bar
-        NSColor.white.withAlphaComponent(0.08).setFill()
-        NSBezierPath(rect: NSRect(x: 0, y: barY, width: bounds.width, height: 1)).fill()
-
-        let scale = window?.backingScaleFactor ?? 2.0
-        let pixelW = Int(selectionRect.width * scale)
-        let pixelH = Int(selectionRect.height * scale)
-
-        let labelAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: NSColor.white.withAlphaComponent(0.6),
-        ]
-        let dimText = "\(pixelW) × \(pixelH) px" as NSString
-        let dimSize = dimText.size(withAttributes: labelAttrs)
-        let textY = barRect.midY - dimSize.height / 2
-
-        // Size label — static, non-clickable
-        dimText.draw(at: NSPoint(x: detachedLeftPad, y: textY), withAttributes: labelAttrs)
-        sizeLabelRect = .zero  // prevent the normal click-to-resize from firing
-
-        // Crop button — right after the size label
-        let cropBtnPadding: CGFloat = 8
-        let cropBtnH: CGFloat = 20
-        let isCropping = (currentTool == .crop)
-        let cropLabel = "Crop" as NSString
-        let cropLabelAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: isCropping ? NSColor.black : NSColor.white.withAlphaComponent(0.9),
-        ]
-        let cropTextSize = cropLabel.size(withAttributes: cropLabelAttrs)
-        let cropBtnW = cropTextSize.width + cropBtnPadding * 2
-        let cropBtnX = detachedLeftPad + dimSize.width + 10
-        let cropBtnY = barRect.midY - cropBtnH / 2
-        let cropBtnRect = NSRect(x: cropBtnX, y: cropBtnY, width: cropBtnW, height: cropBtnH)
-        detachedCropButtonRect = cropBtnRect
-
-        if isCropping {
-            ToolbarLayout.accentColor.setFill()
-        } else {
-            ToolbarLayout.bgColor.withAlphaComponent(0.85).setFill()
-        }
-        NSBezierPath(roundedRect: cropBtnRect, xRadius: 4, yRadius: 4).fill()
-        cropLabel.draw(at: NSPoint(x: cropBtnRect.minX + cropBtnPadding, y: cropBtnRect.midY - cropTextSize.height / 2), withAttributes: cropLabelAttrs)
-
-        // Zoom label (centre) — clickable to type zoom value
-        let zoom = zoomLevel
-        let zoomText: String
-        if abs(zoom - 1.0) < 0.005 {
-            zoomText = "1×"
-        } else if zoom >= 10 {
-            zoomText = String(format: "%.0f×", zoom)
-        } else {
-            zoomText = String(format: "%.1f×", zoom).replacingOccurrences(of: ".0×", with: "×")
-        }
-        let zoomClickAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: NSColor.white.withAlphaComponent(zoomInputField == nil ? 0.9 : 0.0),
-        ]
-        let zoomStr = zoomText as NSString
-        let zoomSize = zoomStr.size(withAttributes: zoomClickAttrs)
-        let zoomPad: CGFloat = 6
-        let zoomLabelW = zoomSize.width + zoomPad * 2
-        let zoomLabelH = dimSize.height + 4
-        let zoomLabelX = barRect.midX - zoomLabelW / 2
-        let zoomLabelY = barRect.midY - zoomLabelH / 2
-        let zRect = NSRect(x: zoomLabelX, y: zoomLabelY, width: zoomLabelW, height: zoomLabelH)
-        zoomLabelRect = zRect
-        zoomLabelOpacity = 1.0  // always visible in detached mode
-
-        ToolbarLayout.bgColor.withAlphaComponent(0.7).setFill()
-        NSBezierPath(roundedRect: zRect, xRadius: 4, yRadius: 4).fill()
-        zoomStr.draw(at: NSPoint(x: zRect.minX + zoomPad, y: zRect.midY - zoomSize.height / 2), withAttributes: zoomClickAttrs)
-
-        // Reset zoom button — right of zoom label, only when not at 1×
-        detachedResetZoomRect = .zero
-        if abs(zoom - 1.0) >= 0.005 {
-            let btnLabel = "Reset" as NSString
-            let btnAttrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-                .foregroundColor: NSColor.white.withAlphaComponent(0.9),
-            ]
-            let btnSize = btnLabel.size(withAttributes: btnAttrs)
-            let btnW = btnSize.width + 16
-            let btnH: CGFloat = 20
-            let btnX = zRect.maxX + 8
-            let btnY = barRect.midY - btnH / 2
-            let btnRect = NSRect(x: btnX, y: btnY, width: btnW, height: btnH)
-            detachedResetZoomRect = btnRect
-
-            ToolbarLayout.bgColor.withAlphaComponent(0.85).setFill()
-            NSBezierPath(roundedRect: btnRect, xRadius: 4, yRadius: 4).fill()
-            btnLabel.draw(at: NSPoint(x: btnRect.minX + 8, y: btnRect.midY - btnSize.height / 2), withAttributes: btnAttrs)
-        }
     }
 
     // MARK: - Pencil smoothing
@@ -2624,7 +2521,7 @@ class OverlayView: NSView {
         return result
     }
 
-    // MARK: - Checkerboard (detached zoom-out background)
+    // MARK: - Checkerboard
 
     private func drawCheckerboard(in rect: NSRect) {
         let size: CGFloat = 8
@@ -2649,7 +2546,8 @@ class OverlayView: NSView {
 
     /// Convert a point in view space to canvas (annotation) space by reversing the zoom transform.
     private func viewToCanvas(_ p: NSPoint) -> NSPoint {
-        guard zoomLevel != 1.0 else { return p }
+        if zoomLevel == 1.0 { return p }
+        guard zoomAnchorCanvas != .zero || zoomAnchorView != .zero else { return p }
         return NSPoint(
             x: zoomAnchorCanvas.x + (p.x - zoomAnchorView.x) / zoomLevel,
             y: zoomAnchorCanvas.y + (p.y - zoomAnchorView.y) / zoomLevel
@@ -2658,6 +2556,7 @@ class OverlayView: NSView {
 
     private func applyZoomTransform(to context: NSGraphicsContext) {
         guard zoomLevel != 1.0 else { return }
+        guard zoomAnchorCanvas != .zero || zoomAnchorView != .zero else { return }
         let cgCtx = context.cgContext
         // screen = anchorView + (canvas - anchorCanvas) * zoom
         cgCtx.translateBy(x: zoomAnchorView.x - zoomAnchorCanvas.x * zoomLevel,
@@ -2670,7 +2569,7 @@ class OverlayView: NSView {
         // Canvas point currently under cursor (before zoom change)
         let canvasUnderCursor = viewToCanvas(cursorView)
         zoomLevel = max(zoomMin, min(zoomMax, level))
-        // After zoom change, pin that canvas point to the cursor's view position
+        // After zoom change, pin that canvas point to the cursor's view position.
         zoomAnchorCanvas = canvasUnderCursor
         zoomAnchorView = cursorView
         clampZoomAnchor()
@@ -2700,10 +2599,9 @@ class OverlayView: NSView {
                                   height: abs(canvasEnd.y - canvasOrigin.y))
 
         // Map canvas rect → image pixel rect.
-        // In detached mode the image is drawn in selectionRect,
-        // so canvas coords map 1:1 to view coords (no extra scaling).
         let imgW = originalImage.size.width
         let imgH = originalImage.size.height
+
         let scaleX = imgW / selectionRect.width
         let scaleY = imgH / selectionRect.height
 
@@ -2711,8 +2609,7 @@ class OverlayView: NSView {
         let pixelY = (canvasRect.minY - selectionRect.minY) * scaleY
         let pixelW = canvasRect.width  * scaleX
         let pixelH = canvasRect.height * scaleY
-
-        // CGImage is flipped (top-left origin), NSImage is bottom-left.
+        // Clamp to image bounds.
         let cgPixelRect = CGRect(
             x: max(0, pixelX),
             y: max(0, CGFloat(cgOriginal.height) - pixelY - pixelH),
@@ -2723,7 +2620,6 @@ class OverlayView: NSView {
         guard cgPixelRect.width > 0, cgPixelRect.height > 0,
               let croppedCG = cgOriginal.cropping(to: cgPixelRect) else { return }
 
-        // Translate annotations: shift them so canvasRect.origin maps to (selectionRect.origin).
         let dx = selectionRect.minX - canvasRect.minX
         let dy = selectionRect.minY - canvasRect.minY
         for ann in annotations { ann.move(dx: dx, dy: dy) }
@@ -2738,32 +2634,32 @@ class OverlayView: NSView {
         needsDisplay = true
     }
 
-    /// Clamp zoomAnchorView so the zoomed content never exposes anything outside selectionRect.
+    /// Clamp zoomAnchorView.
     ///
     /// Transform: screenPos = zoomAnchorView + (canvasPos - zoomAnchorCanvas) * zoom
     ///
-    /// For the selection edges to stay covered:
-    ///   canvas minX must map to screen X ≤ selection minX  →  anchorView.x upper bound
-    ///   canvas maxX must map to screen X ≥ selection maxX  →  anchorView.x lower bound
-    ///   (same for Y)
+    /// zoom > 1×: keep all four image edges inside selectionRect (no empty border visible).
+    /// zoom < 1×: allow free panning but keep at least `margin` screen-space pixels of the
+    ///            image visible on each side, so the user never scrolls completely off canvas.
     private func clampZoomAnchor() {
-        guard zoomLevel > 1.0 else { return }
+        guard zoomLevel != 1.0 else { return }
         let r = selectionRect
         let z = zoomLevel
         let ac = zoomAnchorCanvas
         var av = zoomAnchorView
 
-        // X: anchorView.x must satisfy both:
-        //   av.x ≤ r.minX - (r.minX - ac.x) * z   (left edge stays covered)
-        //   av.x ≥ r.maxX - (r.maxX - ac.x) * z   (right edge stays covered)
-        let maxAVx = r.minX - (r.minX - ac.x) * z
-        let minAVx = r.maxX - (r.maxX - ac.x) * z
-        av.x = max(minAVx, min(maxAVx, av.x))
+        if z > 1.0 {
+            // Zoom-in: edges must stay covered.
+            let maxAVx = r.minX - (r.minX - ac.x) * z
+            let minAVx = r.maxX - (r.maxX - ac.x) * z
+            av.x = max(minAVx, min(maxAVx, av.x))
 
-        // Y: same logic
-        let maxAVy = r.minY - (r.minY - ac.y) * z
-        let minAVy = r.maxY - (r.maxY - ac.y) * z
-        av.y = max(minAVy, min(maxAVy, av.y))
+            let maxAVy = r.minY - (r.minY - ac.y) * z
+            let minAVy = r.maxY - (r.maxY - ac.y) * z
+            av.y = max(minAVy, min(maxAVy, av.y))
+        }
+        // zoom < 1×: no clamping — the image is smaller than the canvas area, let the user
+        // pan freely to access the empty drawing space around it.
 
         zoomAnchorView = av
     }
@@ -3328,17 +3224,7 @@ class OverlayView: NSView {
     func rebuildToolbarLayout() {
         let movableAnnotations = annotations.contains { $0.isMovable }
         bottomButtons = ToolbarLayout.bottomButtons(selectedTool: currentTool, selectedColor: currentColor, beautifyEnabled: beautifyEnabled, beautifyStyleIndex: beautifyStyleIndex, hasAnnotations: movableAnnotations, isRecording: isRecording, isAnnotating: isAnnotating)
-        rightButtons = ToolbarLayout.rightButtons(delaySeconds: delaySeconds, beautifyEnabled: beautifyEnabled, beautifyStyleIndex: beautifyStyleIndex, hasAnnotations: movableAnnotations, translateEnabled: translateEnabled, isRecording: isRecording, isAnnotating: isAnnotating, isDetached: isDetached)
-        // In detached mode: remove buttons that only make sense in overlay (detach, delay, moveSelection, cancel→close handled by window chrome)
-        if isDetached {
-            rightButtons = rightButtons.filter {
-                if case .detach = $0.action { return false }
-                if case .moveSelection = $0.action { return false }
-                if case .delayCapture = $0.action { return false }
-                if case .cancel = $0.action { return false }
-                return true
-            }
-        }
+        rightButtons = ToolbarLayout.rightButtons(delaySeconds: delaySeconds, beautifyEnabled: beautifyEnabled, beautifyStyleIndex: beautifyStyleIndex, hasAnnotations: movableAnnotations, translateEnabled: translateEnabled, isRecording: isRecording, isAnnotating: isAnnotating)
 
         // Place each toolbar inside if it would go off-screen
         let bottomMargin: CGFloat = 50  // toolbar height + gap
@@ -3499,25 +3385,6 @@ class OverlayView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-
-        // Detached top bar buttons
-        if isDetached {
-            if detachedResetZoomRect != .zero && detachedResetZoomRect.contains(point) {
-                resetZoom()
-                needsDisplay = true
-                return
-            }
-            if detachedCropButtonRect != .zero && detachedCropButtonRect.contains(point) {
-                currentTool = (currentTool == .crop) ? .arrow : .crop
-                needsDisplay = true
-                return
-            }
-            // Zoom label click — open zoom input
-            if zoomLabelRect != .zero && zoomLabelRect.contains(point) && zoomInputField == nil {
-                showZoomInput()
-                return
-            }
-        }
 
         // Barcode bar button hit-test
         if detectedBarcodePayload != nil && barcodeActionRects.count == 2 {
@@ -3898,7 +3765,7 @@ class OverlayView: NSView {
                 return
             }
 
-            // Crop tool drag (detached mode only)
+            // Crop tool drag
             if currentTool == .crop && selectionRect.contains(point) {
                 isCropDragging = true
                 cropDragStart = point
@@ -3907,15 +3774,16 @@ class OverlayView: NSView {
                 return
             }
 
-            // Inside selection — draw annotation (convert to canvas space for zoom)
-            if selectionRect.contains(point) && currentTool != .crop {
+            // Start annotation (convert to canvas space for zoom).
+            // Require the click to be inside the selection rectangle.
+            if currentTool != .crop && selectionRect.contains(point) {
                 let canvasPoint = viewToCanvas(point)
                 startAnnotation(at: canvasPoint)
                 return
             }
 
-            // Outside everything - start new selection (locked during recording or detached mode)
-            guard !isRecording && !isDetached else { return }
+            // Outside everything - start new selection (locked during recording)
+            guard !isRecording else { return }
             showToolbars = false
             annotations.removeAll()
             undoStack.removeAll()
@@ -4098,7 +3966,7 @@ class OverlayView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        // Crop commit (detached mode only)
+        // Crop commit
         if isCropDragging {
             isCropDragging = false
             let rect = cropDragRect
@@ -4366,7 +4234,7 @@ class OverlayView: NSView {
 
         // Phase-based (trackpad) scroll without Cmd → pan only, never zoom
         if isTrackpadPhased && !isCommandScroll {
-            guard zoomLevel != 1.0 || isDetached else { return }  // allow pan when zoomed or in detached mode
+            guard zoomLevel != 1.0 else { return }  // pan only makes sense when zoomed
             let dx = event.scrollingDeltaX
             let dy = event.scrollingDeltaY
             zoomAnchorView.x += dx
@@ -4387,7 +4255,7 @@ class OverlayView: NSView {
     override func magnify(with event: NSEvent) {
         guard state == .selected else { return }
         let cursor = convert(event.locationInWindow, from: nil)
-        setZoom(zoomLevel + event.magnification * zoomLevel, cursorView: cursor)
+        setZoom(zoomLevel + event.magnification, cursorView: cursor)
     }
 
     // MARK: - Middle Mouse (toggle move mode)
@@ -4558,8 +4426,6 @@ class OverlayView: NSView {
             rebuildToolbarLayout()
         case .cancel:
             overlayDelegate?.overlayViewDidCancel()
-        case .detach:
-            overlayDelegate?.overlayViewDidRequestDetach()
         case .scrollCapture:
             overlayDelegate?.overlayViewDidRequestScrollCapture(rect: selectionRect)
         }
@@ -4676,7 +4542,9 @@ class OverlayView: NSView {
     // MARK: - Annotation Creation
 
     private func startAnnotation(at point: NSPoint) {
-        guard selectionRect.contains(point) else { return }
+
+        // Color sampler is preview-only, no annotation created on click.
+        if currentTool == .colorSampler { return }
 
         // Select/move tool: find annotation under cursor
         if currentTool == .select {
@@ -4841,10 +4709,7 @@ class OverlayView: NSView {
 
     private func updateAnnotation(at point: NSPoint, shiftHeld: Bool = false) {
         guard let annotation = currentAnnotation else { return }
-        var clampedPoint = NSPoint(
-            x: max(selectionRect.minX, min(point.x, selectionRect.maxX)),
-            y: max(selectionRect.minY, min(point.y, selectionRect.maxY))
-        )
+        var clampedPoint = point
 
         if shiftHeld {
             let start = annotation.startPoint
@@ -5396,6 +5261,12 @@ class OverlayView: NSView {
                 needsDisplay = true
             }
         default:
+            // C (without Cmd) — copy color hex when color sampler is active
+            if event.keyCode == 8 && !event.modifierFlags.contains(.command) &&
+               currentTool == .colorSampler && colorSamplerPoint != .zero {
+                copyColorAtSamplerPoint()
+                return
+            }
             if event.modifierFlags.contains(.command) {
                 if event.charactersIgnoringModifiers == "z" {
                     if event.modifierFlags.contains(.shift) {
@@ -5766,22 +5637,14 @@ class OverlayView: NSView {
         needsDisplay = true
 
         // Crop selected region for Vision.
-        // In detached mode the screenshot is already the selection content, so draw it 1:1.
-        // In overlay mode the screenshot covers the full bounds, so offset to extract the selection.
+        // The screenshot covers the full bounds, so offset to extract the selection.
         let regionImage = NSImage(size: selectionRect.size)
         regionImage.lockFocus()
-        if isDetached {
-            screenshot.draw(
-                in: NSRect(origin: .zero, size: selectionRect.size),
-                from: .zero, operation: .copy, fraction: 1.0
-            )
-        } else {
-            screenshot.draw(
-                in: NSRect(x: -selectionRect.origin.x, y: -selectionRect.origin.y,
-                           width: bounds.width, height: bounds.height),
-                from: .zero, operation: .copy, fraction: 1.0
-            )
-        }
+        screenshot.draw(
+            in: NSRect(x: -selectionRect.origin.x, y: -selectionRect.origin.y,
+                       width: bounds.width, height: bounds.height),
+            from: .zero, operation: .copy, fraction: 1.0
+        )
         regionImage.unlockFocus()
 
         guard let tiffData = regionImage.tiffRepresentation,
@@ -6003,7 +5866,7 @@ class OverlayView: NSView {
         )
     }
 
-    /// Restore editor state — used when transferring to a detached window.
+    /// Restore editor state.
     /// Translates annotation coordinates by `offset` (the selection origin in the original view).
     func applyEditorState(_ s: OverlayEditorState, translatingBy offset: NSPoint = .zero) {
         screenshotImage = s.screenshotImage
@@ -6094,6 +5957,8 @@ class OverlayView: NSView {
         isResizingAnnotation = false
         pressedButtonIndex = -1
         loupeCursorPoint = .zero
+        colorSamplerPoint = .zero
+        colorSamplerBitmap = nil
         overlayErrorTimer?.invalidate()
         overlayErrorTimer = nil
         overlayErrorMessage = nil

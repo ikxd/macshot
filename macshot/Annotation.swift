@@ -17,6 +17,7 @@ enum AnnotationTool: Int, CaseIterable {
     case select          // select & move existing annotations
     case translateOverlay // translated text painted over original
     case crop            // crop image (detached editor only)
+    case colorSampler    // pick color from screen
 }
 
 class Annotation {
@@ -241,6 +242,8 @@ class Annotation {
             break  // handled separately in OverlayView
         case .translateOverlay:
             drawTranslateOverlay()
+        case .colorSampler:
+            break  // preview-only tool, no annotation drawn
         }
     }
 
@@ -660,11 +663,33 @@ class Annotation {
         return magnifiedImage
     }
 
+    // Cached loupe chrome objects (shared across all loupe annotations)
+    private static let loupeOuterShadow: NSShadow = {
+        let s = NSShadow()
+        s.shadowColor = NSColor.black.withAlphaComponent(0.4)
+        s.shadowOffset = NSSize(width: 0, height: -6)
+        s.shadowBlurRadius = 14
+        return s
+    }()
+    private static let loupeInnerShadow: NSShadow = {
+        let s = NSShadow()
+        s.shadowColor = NSColor.black.withAlphaComponent(0.5)
+        s.shadowOffset = NSSize(width: 0, height: -3)
+        s.shadowBlurRadius = 6
+        return s
+    }()
+    private static let loupeGradient: CGGradient? = {
+        let colors = [
+            NSColor.white.withAlphaComponent(0.95).cgColor,
+            NSColor(white: 0.7, alpha: 0.85).cgColor,
+        ] as CFArray
+        return CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0.0, 1.0])
+    }()
+
     private func drawLoupe(in context: NSGraphicsContext) {
         let rect = boundingRect
         guard rect.width > 10, rect.height > 10 else { return }
-        
-        // Ensure perfect circle
+
         let size = min(rect.width, rect.height)
         let squareRect = NSRect(
             x: rect.origin.x + (rect.width - size) / 2,
@@ -673,80 +698,67 @@ class Annotation {
             height: size
         )
 
-        context.saveGraphicsState()
-
-        // 1. Draw profound outer drop shadow
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.4)
-        shadow.shadowOffset = NSSize(width: 0, height: -6)
-        shadow.shadowBlurRadius = 14
-        shadow.set()
-        
         let path = NSBezierPath(ovalIn: squareRect)
-        NSColor.white.setFill() // throw shadow
+
+        // 1. Outer drop shadow
+        context.saveGraphicsState()
+        Self.loupeOuterShadow.set()
+        NSColor.white.setFill()
         path.fill()
-        
         context.restoreGraphicsState()
-        
-        // 2. Clip to the perfectly circular lens
+
+        // 2. Magnified content clipped to circle
         context.saveGraphicsState()
         path.addClip()
 
-        // Draw live or baked magnified image
         if let baked = bakedBlurNSImage {
-            baked.draw(in: squareRect, from: NSRect(origin: .zero, size: baked.size), operation: .sourceOver, fraction: 1.0)
-        } else if let liveImage = generateLoupeImage() {
-            liveImage.draw(in: squareRect, from: NSRect(origin: .zero, size: liveImage.size), operation: .sourceOver, fraction: 1.0)
-        } else {
-            NSColor.white.withAlphaComponent(0.1).setFill()
-            path.fill()
+            baked.draw(in: squareRect, from: NSRect(origin: .zero, size: baked.size),
+                       operation: .sourceOver, fraction: 1.0)
+        } else if let image = sourceImage {
+            // Draw directly from source without creating an intermediate image.
+            let imgSize = image.size
+            let scaleX = imgSize.width / sourceImageBounds.width
+            let scaleY = imgSize.height / sourceImageBounds.height
+            let magnification: CGFloat = 2.0
+            let srcSize = size / magnification
+            let cx = rect.midX, cy = rect.midY
+            let fromRect = NSRect(
+                x: (cx - srcSize/2) * scaleX,
+                y: (cy - srcSize/2) * scaleY,
+                width: srcSize * scaleX,
+                height: srcSize * scaleY
+            )
+            context.imageInterpolation = .high
+            image.draw(in: squareRect, from: fromRect, operation: .copy, fraction: 1.0)
         }
         context.restoreGraphicsState()
 
-        // 3. Gradient border ring (light at top, darker at bottom — like a real lens rim)
-        if let cgCtx = context.cgContext as CGContext? {
-            let borderWidth: CGFloat = 4.0
-            // Clip to the ring between outer and inner circle
-            let outerPath = NSBezierPath(ovalIn: squareRect)
-            let innerPath = NSBezierPath(ovalIn: squareRect.insetBy(dx: borderWidth, dy: borderWidth))
-            let ringPath = NSBezierPath()
-            ringPath.append(outerPath)
-            ringPath.append(innerPath.reversed)
-            cgCtx.saveGState()
-            ringPath.addClip()
-            // Draw a vertical linear gradient: bright white at top, mid-gray at bottom
-            let colors = [
-                NSColor.white.withAlphaComponent(0.95).cgColor,
-                NSColor(white: 0.7, alpha: 0.85).cgColor,
-            ] as CFArray
-            let locs: [CGFloat] = [0.0, 1.0]
-            let colorSpace = CGColorSpaceCreateDeviceRGB()
-            if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: locs) {
-                cgCtx.drawLinearGradient(
-                    gradient,
-                    start: CGPoint(x: squareRect.midX, y: squareRect.maxY),
-                    end:   CGPoint(x: squareRect.midX, y: squareRect.minY),
-                    options: []
-                )
-            }
-            cgCtx.restoreGState()
+        // 3. Gradient border ring
+        let cgCtx = context.cgContext
+        let borderWidth: CGFloat = 4.0
+        let innerPath = NSBezierPath(ovalIn: squareRect.insetBy(dx: borderWidth, dy: borderWidth))
+        let ringPath = NSBezierPath()
+        ringPath.append(path)
+        ringPath.append(innerPath.reversed)
+        cgCtx.saveGState()
+        ringPath.addClip()
+        if let gradient = Self.loupeGradient {
+            cgCtx.drawLinearGradient(
+                gradient,
+                start: CGPoint(x: squareRect.midX, y: squareRect.maxY),
+                end:   CGPoint(x: squareRect.midX, y: squareRect.minY),
+                options: []
+            )
         }
-        
-        // 4. Inner drop shadow to emulate true 3D glass refraction
+        cgCtx.restoreGState()
+
+        // 4. Inner shadow
         context.saveGraphicsState()
-        let innerShadow = NSShadow()
-        innerShadow.shadowColor = NSColor.black.withAlphaComponent(0.5)
-        innerShadow.shadowOffset = NSSize(width: 0, height: -3)
-        innerShadow.shadowBlurRadius = 6
-        innerShadow.set()
-        
-        // Create an inverted bezier mask ("donut") to cast a shadow inwards onto the lens
-        let holeRadius: CGFloat = 30
-        let holeRect = squareRect.insetBy(dx: -holeRadius, dy: -holeRadius)
+        Self.loupeInnerShadow.set()
+        let holeRect = squareRect.insetBy(dx: -30, dy: -30)
         let innerHole = NSBezierPath(rect: holeRect)
         innerHole.append(NSBezierPath(ovalIn: squareRect).reversed)
-        
-        path.addClip() // Contain the shadow inside the lens
+        path.addClip()
         NSColor.black.withAlphaComponent(0.8).setFill()
         innerHole.fill()
         context.restoreGraphicsState()

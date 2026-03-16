@@ -203,7 +203,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isCapturing = false
     }
 
-    private func showFloatingThumbnail(image: NSImage) {
+    func showFloatingThumbnail(image: NSImage) {
         let enabled = UserDefaults.standard.object(forKey: "showFloatingThumbnail") as? Bool ?? true
         guard enabled else { return }
 
@@ -247,18 +247,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.showPin(image: image)
             self.playCopySound()
         }
-        controller.onEdit = { [weak self] in
-            guard let self = self else { return }
-            let state = OverlayEditorState(
-                screenshotImage: image,
-                selectionRect: NSRect(origin: .zero, size: image.size),
-                annotations: [], undoStack: [], redoStack: [],
-                currentTool: .arrow, currentColor: .systemRed,
-                currentStrokeWidth: 3, currentMarkerSize: 3,
-                currentNumberSize: 3, numberCounter: 0,
-                beautifyEnabled: false, beautifyStyleIndex: 0
-            )
-            DetachedEditorWindowController.open(with: state, offset: .zero)
+        controller.onEdit = {
+            // Editor window removed
         }
         controller.onUpload = { [weak self] in
             guard let self = self else { return }
@@ -310,12 +300,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Upload
 
-    /// Public entry point used by DetachedEditorWindowController.
     func uploadImage(_ image: NSImage) {
         showUploadProgress(image: image)
     }
 
-    /// Public entry point used by DetachedEditorWindowController.
     func showPin(image: NSImage) {
         let pin = PinWindowController(image: image)
         pin.delegate = self

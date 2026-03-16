@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.3.0] - 2026-03-16
+
+### Added
+- **Color Picker tool** — new eyedropper tool in the bottom toolbar. Hover over any pixel to see its hex color in real time with a color swatch preview. Press `C` to copy the hex value (e.g. `#FF3B30`) to clipboard. Accurate sRGB sampling. Can be disabled in Preferences like any other tool.
+- **Draw outside selection** — annotation strokes (pencil, arrow, line, etc.) can now continue past the selection boundary. Start drawing inside the selection and drag outside freely.
+- **Floating thumbnail on copy from overlay** — Cmd+C now shows the floating thumbnail preview in the bottom-right corner, matching the behavior when confirming a capture.
+
+### Improved
+- **Loupe tool performance** — live preview no longer creates intermediate images or calls `compositedImage()` on every mouse move. Placed loupes draw directly from the source image. Shadow and gradient objects are cached as statics. Significantly smoother cursor tracking.
+- **Marker cursor preview** — now scales correctly with zoom level (drawn inside the zoom transform).
+- **Zoom smoothness** — zooming in/out no longer causes a jump when crossing 1x. The zoom transform is continuous at all levels.
+
+### Removed
+- **Editor window mode** — the standalone editor window has been removed. All annotation, zoom, crop, and export features work directly in the overlay.
+
+### Fixed
+- **Overlay translate clipping** — translated text overlays now stay clipped to the selection rectangle when zoomed, preventing overflow into the dark overlay area.
+
 ## [2.2.0] - 2026-03-15
 
 ### Added

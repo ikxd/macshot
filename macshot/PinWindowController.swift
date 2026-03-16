@@ -74,23 +74,7 @@ class PinWindowController {
     }
 
     private func openInEditor() {
-        let state = OverlayEditorState(
-            screenshotImage: image,
-            selectionRect: NSRect(origin: .zero, size: image.size),
-            annotations: [],
-            undoStack: [],
-            redoStack: [],
-            currentTool: .arrow,
-            currentColor: .red,
-            currentStrokeWidth: 2,
-            currentMarkerSize: 14,
-            currentNumberSize: 20,
-            numberCounter: 1,
-            beautifyEnabled: false,
-            beautifyStyleIndex: 0
-        )
-        DetachedEditorWindowController.open(with: state, offset: .zero)
-        close()
+        // Editor window removed
     }
 }
 

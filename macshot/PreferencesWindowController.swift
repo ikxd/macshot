@@ -359,7 +359,7 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate {
             (.rectangle, "Rectangle"), (.filledRectangle, "Filled Rectangle"),
             (.ellipse, "Ellipse"), (.marker, "Marker"), (.text, "Text"),
             (.number, "Number / Counter"), (.pixelate, "Pixelate"),
-            (.blur, "Blur"), (.loupe, "Magnify (Loupe)"), (.measure, "Measure"),
+            (.blur, "Blur"), (.loupe, "Magnify (Loupe)"), (.colorSampler, "Color Picker"), (.measure, "Measure"),
         ]
         let enabledTools = UserDefaults.standard.array(forKey: "enabledTools") as? [Int]
         let toolsGrid = makeToggleGrid(items: annotationTools.map { (tag: $0.rawValue, label: $1) },
