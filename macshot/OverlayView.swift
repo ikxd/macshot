@@ -7211,7 +7211,7 @@ class OverlayView: NSView {
                     }
                     // Number start-at stepper
                     if optionsNumberStartMinusRect.contains(point) {
-                        numberStartAt = max(0, numberStartAt - 1)
+                        numberStartAt = max(1, numberStartAt - 1)
                         UserDefaults.standard.set(numberStartAt, forKey: "numberStartAt")
                         needsDisplay = true
                         return

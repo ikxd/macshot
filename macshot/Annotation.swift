@@ -121,7 +121,7 @@ enum NumberFormat: Int, CaseIterable {
 
     private static func toAlpha(_ n: Int, uppercase: Bool) -> String {
         let base = uppercase ? Character("A") : Character("a")
-        let idx = ((n - 1) % 26)
+        let idx = ((max(1, n) - 1) % 26)
         return String(Character(UnicodeScalar(base.asciiValue! + UInt8(idx))))
     }
 }
