@@ -504,6 +504,7 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate, NSWind
     private func stopShortcutRecording() {
         if let slot = recordingSlot {
             hotkeyButtons[slot]?.title = "Record"
+            hotkeyFields[slot]?.stringValue = HotkeyManager.displayString(for: slot)
         }
         recordingSlot = nil
         if let m = localMonitor { NSEvent.removeMonitor(m); localMonitor = nil }
