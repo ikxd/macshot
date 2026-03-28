@@ -161,40 +161,60 @@ class OverlayView: NSView {
     /// Delays clearing hoveredAnnotation so the cursor can travel to handles/buttons that sit outside the hit area.
     private var hoveredAnnotationClearTimer: Timer?
 
-    // Text editing
-    var textEditView: NSTextView?
-    private var textScrollView: NSScrollView?
-    var textFontSize: CGFloat = 20
-    var textBold: Bool = false
-    var textItalic: Bool = false
-    var textUnderline: Bool = false
-    var textStrikethrough: Bool = false
-    var textFontFamily: String = UserDefaults.standard.string(forKey: "textFontFamily") ?? "System"
-
-    // Text options row rects (drawn in secondary toolbar)
-    private var textSizeDecRect: NSRect = .zero
-    private var textSizeIncRect: NSRect = .zero
+    // Text editing — state managed by TextEditingController
+    let textEditor = TextEditingController()
+    var textEditView: NSTextView? { textEditor.textView }
+    var textFontSize: CGFloat {
+        get { textEditor.fontSize }
+        set { textEditor.fontSize = newValue }
+    }
+    var textBold: Bool {
+        get { textEditor.bold }
+        set { textEditor.bold = newValue }
+    }
+    var textItalic: Bool {
+        get { textEditor.italic }
+        set { textEditor.italic = newValue }
+    }
+    var textUnderline: Bool {
+        get { textEditor.underline }
+        set { textEditor.underline = newValue }
+    }
+    var textStrikethrough: Bool {
+        get { textEditor.strikethrough }
+        set { textEditor.strikethrough = newValue }
+    }
+    var textFontFamily: String {
+        get { textEditor.fontFamily }
+        set { textEditor.fontFamily = newValue }
+    }
+    var textAlignment: NSTextAlignment {
+        get { textEditor.alignment }
+        set { textEditor.alignment = newValue }
+    }
+    var textBgEnabled: Bool {
+        get { textEditor.bgEnabled }
+        set { textEditor.bgEnabled = newValue }
+    }
+    var textOutlineEnabled: Bool {
+        get { textEditor.outlineEnabled }
+        set { textEditor.outlineEnabled = newValue }
+    }
+    private var textBgColorValue: NSColor {
+        get { textEditor.bgColor }
+        set { textEditor.bgColor = newValue }
+    }
+    private var textOutlineColorValue: NSColor {
+        get { textEditor.outlineColor }
+        set { textEditor.outlineColor = newValue }
+    }
     private var textFontDropdownRect: NSRect = .zero
-    private var textConfirmRect: NSRect = .zero
-    private var textCancelRect: NSRect = .zero
-    var textAlignment: NSTextAlignment = .left
+    // Text box resize state (stays here — tied to mouse drag handling)
     private var isResizingTextBox: Bool = false
     private var textBoxResizeHandle: ResizeHandle = .none
     private var textBoxResizeStart: NSPoint = .zero
     private var textBoxOrigFrame: NSRect = .zero
-    private var editingAnnotation: Annotation?  // annotation being re-edited
-    var textBgEnabled: Bool = UserDefaults.standard.bool(forKey: "textBgEnabled")
-    var textOutlineEnabled: Bool = UserDefaults.standard.bool(forKey: "textOutlineEnabled")
-    private var textBgColorValue: NSColor = {
-        if let data = UserDefaults.standard.data(forKey: "textBgColor"),
-           let c = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: data) { return c }
-        return NSColor.black.withAlphaComponent(0.6)
-    }()
-    private var textOutlineColorValue: NSColor = {
-        if let data = UserDefaults.standard.data(forKey: "textOutlineColor"),
-           let c = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: data) { return c }
-        return NSColor.white
-    }()
+    private var editingAnnotation: Annotation?
     private var showFontPicker: Bool = false
     private var fontPickerRect: NSRect = .zero
     private var fontPickerItemRects: [NSRect] = []
@@ -1265,13 +1285,13 @@ class OverlayView: NSView {
             }
 
             // Hide the text view when color picker is open for bg/outline (so picker isn't behind it)
-            if let sv = textScrollView {
+            if let sv = textEditor.scrollView {
                 let shouldHide = false
                 sv.isHidden = shouldHide
             }
 
             // Live text box (bg/outline + resize handles)
-            if let sv = textScrollView, textEditView != nil {
+            if let sv = textEditor.scrollView, textEditView != nil {
                 let pad: CGFloat = 4
                 let pillRect = sv.frame.insetBy(dx: -pad, dy: -pad)
                 let cornerR: CGFloat = 4
@@ -2123,7 +2143,7 @@ class OverlayView: NSView {
     }
 
     private func drawFontPickerDropdown() {
-        let families = OverlayView.fontFamilies
+        let families = TextEditingController.fontFamilies
         let itemH: CGFloat = 24
         let pickerW: CGFloat = 180
         let pickerH = CGFloat(families.count) * itemH + 8
@@ -4033,7 +4053,7 @@ class OverlayView: NSView {
         // Check text box resize handles when editing
         if isTextEditing && showToolbars {
             // Check text box resize handles
-            if let sv = textScrollView {
+            if let sv = textEditor.scrollView {
                 let hs: CGFloat = 10  // hit area
                 let f = sv.frame
                 let handles: [(ResizeHandle, NSRect)] = [
@@ -4057,7 +4077,7 @@ class OverlayView: NSView {
                 }
             }
             // Clicking on the text editor itself — don't commit
-            if let sv = textScrollView, sv.frame.contains(point) {
+            if let sv = textEditor.scrollView, sv.frame.contains(point) {
                 return
             }
         }
@@ -4105,7 +4125,7 @@ class OverlayView: NSView {
                     if fontPickerRect.contains(point) {
                         for (i, itemRect) in fontPickerItemRects.enumerated() {
                             if itemRect.contains(point) {
-                                let family = OverlayView.fontFamilies[i]
+                                let family = TextEditingController.fontFamilies[i]
                                 textFontFamily = family
                                 UserDefaults.standard.set(family, forKey: "textFontFamily")
                                 applyFontFamilyToSelection(family)
@@ -4207,7 +4227,7 @@ class OverlayView: NSView {
         }
 
         // Handle text box resize
-        if isResizingTextBox, let sv = textScrollView, let tv = textEditView {
+        if isResizingTextBox, let sv = textEditor.scrollView, let tv = textEditView {
             let dx = point.x - textBoxResizeStart.x
             let dy = point.y - textBoxResizeStart.y
             let orig = textBoxOrigFrame
@@ -5390,64 +5410,18 @@ class OverlayView: NSView {
     // MARK: - Text Field
 
     private func showTextField(at point: NSPoint, existingText: NSAttributedString? = nil, existingFrame: NSRect = .zero) {
-        let height = max(28, textFontSize + 12)
-        let defaultW: CGFloat = 200
-        // point is in canvas space — convert to view space for NSView positioning
         let viewPt = canvasToView(point)
-        let svFrame: NSRect
+        let viewFrame: NSRect
         if existingFrame != .zero {
-            let viewOrigin = canvasToView(existingFrame.origin)
-            svFrame = NSRect(origin: viewOrigin, size: existingFrame.size)
+            viewFrame = NSRect(origin: canvasToView(existingFrame.origin), size: existingFrame.size)
         } else {
-            svFrame = NSRect(x: viewPt.x, y: viewPt.y - height, width: defaultW, height: height)
+            let height = max(28, textFontSize + 12)
+            viewFrame = NSRect(x: viewPt.x, y: viewPt.y - height, width: 200, height: height)
         }
-        let scrollView = NSScrollView(frame: svFrame)
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = false
-        scrollView.backgroundColor = .clear
-
-        let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: svFrame.width, height: svFrame.height))
-        tv.isEditable = true
-        tv.isSelectable = true
-        tv.isRichText = true
-        tv.allowsUndo = true
-        tv.backgroundColor = .clear
-        tv.isFieldEditor = false
-        tv.textColor = currentColor
-        tv.insertionPointColor = currentColor
-        tv.isVerticallyResizable = true
-        tv.isHorizontallyResizable = false
-        tv.textContainer?.widthTracksTextView = true
-        tv.textContainer?.containerSize = NSSize(width: svFrame.width, height: CGFloat.greatestFiniteMagnitude)
-        tv.textContainerInset = NSSize(width: 4, height: 4)
-        tv.delegate = self
-        tv.alignment = textAlignment
-
-        let font = currentTextFont()
-        let paraStyle = NSMutableParagraphStyle()
-        paraStyle.alignment = textAlignment
-        tv.typingAttributes = [
-            .font: font,
-            .foregroundColor: currentColor,
-            .paragraphStyle: paraStyle,
-        ]
-
-        scrollView.documentView = tv
-        addSubview(scrollView)
-        textScrollView = scrollView
-        textEditView = tv
-
-        if let existing = existingText {
-            tv.textStorage?.setAttributedString(existing)
-            resizeTextViewToFit()
-        }
-
-        window?.makeFirstResponder(tv)
+        textEditor.createTextView(in: self, at: viewPt, color: currentColor, existingText: existingText, existingFrame: viewFrame)
+        textEditor.textView?.delegate = self
+        if existingText != nil { resizeTextViewToFit() }
         needsDisplay = true
-
     }
 
     private func currentTextFont() -> NSFont {
@@ -5671,9 +5645,8 @@ class OverlayView: NSView {
             annotations.append(ann)
             editingAnnotation = nil
         }
-        textScrollView?.removeFromSuperview()
-        textScrollView = nil
-        textEditView = nil
+        textEditor.scrollView?.removeFromSuperview()
+        textEditor.dismiss()
         showFontPicker = false
         window?.makeFirstResponder(self)
 
@@ -5681,7 +5654,7 @@ class OverlayView: NSView {
     }
 
     func commitTextFieldIfNeeded() {
-        guard let tv = textEditView, let sv = textScrollView else { return }
+        guard let tv = textEditView, let sv = textEditor.scrollView else { return }
         let text = tv.string
         if !text.isEmpty {
             // Render the attributed string into an NSImage using its own layout engine.
@@ -5728,8 +5701,7 @@ class OverlayView: NSView {
         }
         editingAnnotation = nil
         sv.removeFromSuperview()
-        textScrollView = nil
-        textEditView = nil
+        textEditor.dismiss()
         showFontPicker = false
         window?.makeFirstResponder(self)
 
@@ -5906,9 +5878,8 @@ class OverlayView: NSView {
             // when recording mode is entered but capture hasn't started yet.
             guard !isCapturingVideo else { return }
             if textEditView != nil {
-                textScrollView?.removeFromSuperview()
-                textScrollView = nil
-                textEditView = nil
+                textEditor.scrollView?.removeFromSuperview()
+                textEditor.dismiss()
                 showFontPicker = false
                 window?.makeFirstResponder(self)
         
@@ -6991,9 +6962,8 @@ class OverlayView: NSView {
         currentArrowStyle = ArrowStyle(rawValue: UserDefaults.standard.integer(forKey: "currentArrowStyle")) ?? .single
         currentRectFillStyle = RectFillStyle(rawValue: UserDefaults.standard.integer(forKey: "currentRectFillStyle")) ?? .stroke
         currentRectCornerRadius = CGFloat(UserDefaults.standard.object(forKey: "currentRectCornerRadius") as? Double ?? 0)
-        textScrollView?.removeFromSuperview()
-        textScrollView = nil
-        textEditView = nil
+        textEditor.scrollView?.removeFromSuperview()
+        textEditor.dismiss()
         showFontPicker = false
         sizeInputField?.removeFromSuperview()
         sizeInputField = nil
@@ -7060,9 +7030,7 @@ extension OverlayView: NSTextViewDelegate {
             return true
         }
         if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-            textScrollView?.removeFromSuperview()
-            textScrollView = nil
-            textEditView = nil
+            textEditor.dismiss()
             showFontPicker = false
             window?.makeFirstResponder(self)
             needsDisplay = true
@@ -7077,7 +7045,7 @@ extension OverlayView: NSTextViewDelegate {
     }
 
     private func resizeTextViewToFit() {
-        guard let tv = textEditView, let sv = textScrollView else { return }
+        guard let tv = textEditView, let sv = textEditor.scrollView else { return }
         guard let layoutManager = tv.layoutManager, let textContainer = tv.textContainer else { return }
 
         layoutManager.ensureLayout(for: textContainer)

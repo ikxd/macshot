@@ -693,7 +693,7 @@ class ToolOptionsRowView: NSView {
 
     @objc private func fontFamilyClicked(_ sender: NSButton) {
         guard let ov = overlayView else { return }
-        let families = OverlayView.fontFamilies
+        let families = TextEditingController.fontFamilies
         let picker = ListPickerView()
         picker.items = families.map { family in
             .init(title: family, isSelected: family == ov.textFontFamily)
