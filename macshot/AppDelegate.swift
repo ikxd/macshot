@@ -783,9 +783,13 @@ extension AppDelegate: OverlayWindowControllerDelegate {
 
         // Give focus back to the previously active app on cancel.
         // NSApp.hide deactivates macshot, letting macOS activate the next app in the stack.
+        // Check inside the async block so windows created right after cancel (e.g. editor) are detected.
         if recordingEngine == nil {
             DispatchQueue.main.async {
-                NSApp.hide(nil)
+                let hasVisibleWindows = NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) }
+                if !hasVisibleWindows {
+                    NSApp.hide(nil)
+                }
             }
         }
     }

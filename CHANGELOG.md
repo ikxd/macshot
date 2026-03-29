@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.4.3] - 2026-03-29
+
+### Fixed
+- **Editor window not opening** — fixed "Open in Editor" button not working due to the app hiding itself before the editor window could appear.
+
 ## [3.4.2] - 2026-03-29
 
 ### Added
