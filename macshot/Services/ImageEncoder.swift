@@ -135,12 +135,25 @@ enum ImageEncoder {
     }
 
     /// Encode WebP via Swift-WebP (libwebp).
+    /// Uses the CGImage RGBA path directly — the library's NSImage path has a bug
+    /// (assumes RGB stride and logical size instead of pixel size).
     private static func encodeWebP(bitmap: NSBitmapImageRep, quality: CGFloat) -> Data? {
-        let image = NSImage(size: NSSize(width: bitmap.pixelsWide, height: bitmap.pixelsHigh))
-        image.addRepresentation(bitmap)
+        guard let srcImage = bitmap.cgImage else { return nil }
+        let w = srcImage.width
+        let h = srcImage.height
+        // Re-render into a known premultipliedLast RGBA context
+        let cs = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: nil, width: w, height: h,
+            bitsPerComponent: 8, bytesPerRow: w * 4,
+            space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        ctx.draw(srcImage, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let rgbaImage = ctx.makeImage() else { return nil }
+
         let encoder = WebPEncoder()
         let config = WebPEncoderConfig.preset(.picture, quality: Float(quality * 100))
-        return try? encoder.encode(image, config: config)
+        return try? encoder.encode(RGBA: rgbaImage, config: config)
     }
 
     /// Generic CGImageDestination encoder — handles sRGB profile embedding.
@@ -170,36 +183,11 @@ enum ImageEncoder {
     /// Copy image to pasteboard in the configured format.
     /// Uses a single bitmap conversion to avoid redundant encoding.
     static func copyToClipboard(_ image: NSImage) {
-        guard let bitmap = makeBitmap(image) else { return }
-
+        // Use writeObjects with NSImage for lazy encoding — the pasteboard
+        // only encodes when another app reads it. This makes copy instant
+        // regardless of format (PNG/JPEG/HEIC/WebP).
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-
-        switch format {
-        case .png:
-            if let data = encodePNG(bitmap: bitmap) {
-                pasteboard.setData(data, forType: .png)
-            }
-        case .jpeg:
-            if let data = encodeJPEG(bitmap: bitmap, quality: quality) {
-                pasteboard.setData(data, forType: .init("public.jpeg"))
-            }
-        case .heic:
-            if let data = encodeHEIC(bitmap: bitmap, quality: quality) {
-                pasteboard.setData(data, forType: .init("public.heic"))
-            }
-            // Also include PNG for apps that don't understand HEIC
-            if let pngFallback = bitmap.representation(using: .png, properties: [:]) {
-                pasteboard.setData(pngFallback, forType: .png)
-            }
-        case .webp:
-            if let data = encodeWebP(bitmap: bitmap, quality: quality) {
-                pasteboard.setData(data, forType: .init("org.webmproject.webp"))
-            }
-            // Also include PNG for apps that don't understand WebP
-            if let pngFallback = bitmap.representation(using: .png, properties: [:]) {
-                pasteboard.setData(pngFallback, forType: .png)
-            }
-        }
+        pasteboard.writeObjects([image])
     }
 }

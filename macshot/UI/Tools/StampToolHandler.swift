@@ -74,7 +74,7 @@ enum StampEmojis {
         panel.allowedContentTypes = [.image, .png, .jpeg]
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.level = .statusBar + 3
+        panel.level = NSWindow.Level(258)
         panel.begin { response in
             guard response == .OK, let url = panel.url,
                 let image = NSImage(contentsOf: url)

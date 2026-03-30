@@ -194,13 +194,21 @@ extension OverlayView {
         }
 
         // Read current effective values (session override > UserDefaults default)
-        let effectiveFormat = sessionRecordingFormat ?? UserDefaults.standard.string(forKey: "recordingFormat") ?? "mp4"
-        let effectiveFPS = sessionRecordingFPS ?? (UserDefaults.standard.integer(forKey: "recordingFPS") > 0 ? UserDefaults.standard.integer(forKey: "recordingFPS") : 30)
-        let effectiveOnStop = sessionRecordingOnStop ?? UserDefaults.standard.string(forKey: "recordingOnStop") ?? "editor"
+        let effectiveFormat =
+            sessionRecordingFormat ?? UserDefaults.standard.string(forKey: "recordingFormat")
+            ?? "mp4"
+        let effectiveFPS =
+            sessionRecordingFPS
+            ?? (UserDefaults.standard.integer(forKey: "recordingFPS") > 0
+                ? UserDefaults.standard.integer(forKey: "recordingFPS") : 30)
+        let effectiveOnStop =
+            sessionRecordingOnStop ?? UserDefaults.standard.string(forKey: "recordingOnStop")
+            ?? "editor"
 
         // Format: MP4 / GIF
-        let formatSeg = NSSegmentedControl(labels: ["MP4", "GIF"], trackingMode: .selectOne,
-                                           target: nil, action: nil)
+        let formatSeg = NSSegmentedControl(
+            labels: ["MP4", "GIF"], trackingMode: .selectOne,
+            target: nil, action: nil)
         formatSeg.selectedSegment = effectiveFormat == "gif" ? 1 : 0
         (formatSeg.cell as? NSSegmentedCell)?.segmentStyle = .roundRect
 
@@ -213,15 +221,24 @@ extension OverlayView {
             fpsPopup.removeAllItems()
             if isGIF {
                 fpsPopup.addItems(withTitles: ["5", "10", "15"])
-                if selectedFPS <= 5 { fpsPopup.selectItem(at: 0) }
-                else if selectedFPS <= 10 { fpsPopup.selectItem(at: 1) }
-                else { fpsPopup.selectItem(at: 2) }
+                if selectedFPS <= 5 {
+                    fpsPopup.selectItem(at: 0)
+                } else if selectedFPS <= 10 {
+                    fpsPopup.selectItem(at: 1)
+                } else {
+                    fpsPopup.selectItem(at: 2)
+                }
             } else {
                 fpsPopup.addItems(withTitles: ["15", "30", "60", "120"])
-                if selectedFPS <= 15 { fpsPopup.selectItem(at: 0) }
-                else if selectedFPS <= 30 { fpsPopup.selectItem(at: 1) }
-                else if selectedFPS <= 60 { fpsPopup.selectItem(at: 2) }
-                else { fpsPopup.selectItem(at: 3) }
+                if selectedFPS <= 15 {
+                    fpsPopup.selectItem(at: 0)
+                } else if selectedFPS <= 30 {
+                    fpsPopup.selectItem(at: 1)
+                } else if selectedFPS <= 60 {
+                    fpsPopup.selectItem(at: 2)
+                } else {
+                    fpsPopup.selectItem(at: 3)
+                }
             }
         }
         populateFPS(isGIF: effectiveFormat == "gif", selectedFPS: effectiveFPS)
@@ -231,8 +248,14 @@ extension OverlayView {
             weak var overlayView: OverlayView?
             let fpsPopup: NSPopUpButton
             let populateFPS: (Bool, Int) -> Void
-            init(overlayView: OverlayView?, fpsPopup: NSPopUpButton, populateFPS: @escaping (Bool, Int) -> Void) {
-                self.overlayView = overlayView; self.fpsPopup = fpsPopup; self.populateFPS = populateFPS; super.init()
+            init(
+                overlayView: OverlayView?, fpsPopup: NSPopUpButton,
+                populateFPS: @escaping (Bool, Int) -> Void
+            ) {
+                self.overlayView = overlayView
+                self.fpsPopup = fpsPopup
+                self.populateFPS = populateFPS
+                super.init()
             }
             @objc func changed(_ sender: NSSegmentedControl) {
                 let isGIF = sender.selectedSegment == 1
@@ -244,7 +267,10 @@ extension OverlayView {
 
         class FPSHandler: NSObject {
             weak var overlayView: OverlayView?
-            init(overlayView: OverlayView?) { self.overlayView = overlayView; super.init() }
+            init(overlayView: OverlayView?) {
+                self.overlayView = overlayView
+                super.init()
+            }
             @objc func changed(_ sender: NSPopUpButton) {
                 if let title = sender.selectedItem?.title, let fps = Int(title) {
                     overlayView?.sessionRecordingFPS = fps
@@ -254,7 +280,10 @@ extension OverlayView {
 
         class WhenDoneHandler: NSObject {
             weak var overlayView: OverlayView?
-            init(overlayView: OverlayView?) { self.overlayView = overlayView; super.init() }
+            init(overlayView: OverlayView?) {
+                self.overlayView = overlayView
+                super.init()
+            }
             @objc func changed(_ sender: NSPopUpButton) {
                 let values = ["editor", "finder"]
                 overlayView?.sessionRecordingOnStop = values[sender.indexOfSelectedItem]
@@ -266,7 +295,8 @@ extension OverlayView {
         fpsPopup.action = #selector(FPSHandler.changed(_:))
         objc_setAssociatedObject(fpsPopup, "handler", fpsHandler, .OBJC_ASSOCIATION_RETAIN)
 
-        let formatHandler = FormatHandler(overlayView: self, fpsPopup: fpsPopup, populateFPS: populateFPS)
+        let formatHandler = FormatHandler(
+            overlayView: self, fpsPopup: fpsPopup, populateFPS: populateFPS)
         formatSeg.target = formatHandler
         formatSeg.action = #selector(FormatHandler.changed(_:))
         objc_setAssociatedObject(formatSeg, "handler", formatHandler, .OBJC_ASSOCIATION_RETAIN)
@@ -281,7 +311,8 @@ extension OverlayView {
         let whenDoneHandler = WhenDoneHandler(overlayView: self)
         whenDonePopup.target = whenDoneHandler
         whenDonePopup.action = #selector(WhenDoneHandler.changed(_:))
-        objc_setAssociatedObject(whenDonePopup, "handler", whenDoneHandler, .OBJC_ASSOCIATION_RETAIN)
+        objc_setAssociatedObject(
+            whenDonePopup, "handler", whenDoneHandler, .OBJC_ASSOCIATION_RETAIN)
 
         addRow(label: "Format:", control: formatSeg)
         addRow(label: "FPS:", control: fpsPopup)

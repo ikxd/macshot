@@ -222,6 +222,9 @@ extension DetachedEditorWindowController: OverlayViewDelegate {
             SaveDirectoryAccess.stopAccessing(url: dirURL)
         }
     }
+    func overlayViewDidRequestFileSave() {
+        overlayViewDidRequestQuickSave()
+    }
     func overlayViewDidRequestUpload() {
         guard let raw = overlayView?.captureSelectedRegion() else { return }
         let image = applyPostProcessing(raw)

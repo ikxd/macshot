@@ -12,6 +12,7 @@ protocol OverlayViewDelegate: AnyObject {
     func overlayViewDidRequestPin()
     func overlayViewDidRequestOCR()
     func overlayViewDidRequestQuickSave()
+    func overlayViewDidRequestFileSave()
     func overlayViewDidRequestUpload()
     func overlayViewDidRequestShare(anchorView: NSView?)
     @available(macOS 14.0, *)
@@ -820,6 +821,12 @@ class OverlayView: NSView {
     /// Imperative cursor management. Called from mouseMoved and a 30fps timer.
     /// Simplified: arrow for chrome, resize cursors for handles, tool cursor for canvas.
     private func updateCursorForPoint(_ point: NSPoint) {
+        // Arrow cursor when mouse is over an open popover
+        if PopoverHelper.isMouseInsidePopover {
+            NSCursor.arrow.set()
+            return
+        }
+
         // Non-interactive states — simple cursors
         if textEditView != nil {
             NSCursor.arrow.set()
@@ -4702,7 +4709,7 @@ class OverlayView: NSView {
         case .copy:
             overlayDelegate?.overlayViewDidConfirm()
         case .save:
-            overlayDelegate?.overlayViewDidRequestQuickSave()
+            overlayDelegate?.overlayViewDidRequestFileSave()
         case .upload:
             let confirmEnabled = UserDefaults.standard.bool(forKey: "uploadConfirmEnabled")
             if confirmEnabled {
@@ -5367,7 +5374,7 @@ class OverlayView: NSView {
             if textEditView == nil, state == .selected {
                 let saveMode =
                     !(UserDefaults.standard.object(forKey: "quickModeCopyToClipboard") as? Bool
-                    ?? false)
+                    ?? true)
                 if saveMode {
                     overlayDelegate?.overlayViewDidRequestQuickSave()
                 } else {

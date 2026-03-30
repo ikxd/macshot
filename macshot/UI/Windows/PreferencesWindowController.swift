@@ -1282,7 +1282,7 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate, NSWind
         historySizeField.integerValue = historySize
         historySizeStepper.integerValue = historySize
 
-        let quickModeCopy = UserDefaults.standard.object(forKey: "quickModeCopyToClipboard") as? Bool ?? false
+        let quickModeCopy = UserDefaults.standard.object(forKey: "quickModeCopyToClipboard") as? Bool ?? true
         quickModePopup.selectItem(at: quickModeCopy ? 1 : 0)
 
         let format = ImageEncoder.format

@@ -53,6 +53,30 @@ class ListPickerView: NSView {
         return NSSize(width: w, height: h)
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil {
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(scrollDidChange),
+                name: NSView.boundsDidChangeNotification, object: enclosingScrollView?.contentView)
+            enclosingScrollView?.contentView.postsBoundsChangedNotifications = true
+        } else {
+            NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: nil)
+        }
+    }
+
+    @objc private func scrollDidChange(_ notification: Notification) {
+        guard let mouseLocation = window?.mouseLocationOutsideOfEventStream else { return }
+        for rv in rowViews {
+            let local = rv.convert(mouseLocation, from: nil)
+            let inside = rv.bounds.contains(local)
+            if rv.isHovered != inside {
+                rv.isHovered = inside
+                rv.needsDisplay = true
+            }
+        }
+    }
+
     /// Scroll the enclosing scroll view so the selected item is visible.
     func scrollToSelected() {
         guard let scrollView = enclosingScrollView else { return }
@@ -80,7 +104,7 @@ private class ListPickerRowView: NSView {
     var index: Int = 0
     var onSelect: ((Int) -> Void)?
 
-    private var isHovered: Bool = false
+    fileprivate var isHovered: Bool = false
     private var trackingArea: NSTrackingArea?
 
     override func draw(_ dirtyRect: NSRect) {
@@ -124,4 +148,5 @@ private class ListPickerRowView: NSView {
 
     override func mouseEntered(with event: NSEvent) { isHovered = true; needsDisplay = true }
     override func mouseExited(with event: NSEvent) { isHovered = false; needsDisplay = true }
+
 }

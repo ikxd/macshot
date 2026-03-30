@@ -59,11 +59,13 @@ class ScreenshotHistory {
         let max = maxEntries
         guard max > 0 else { return }
 
-        // Encode using configured format
-        guard let imageData = ImageEncoder.encode(image) else { return }
+        // Always save history as PNG — it's internal storage, format setting doesn't matter
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let imageData = bitmap.representation(using: .png, properties: [:]) else { return }
 
         let id = UUID().uuidString
-        let ext = ImageEncoder.fileExtension
+        let ext = "png"
         let fileURL = historyDir.appendingPathComponent("\(id).\(ext)")
         let thumbURL = historyDir.appendingPathComponent("\(id)_thumb.png")
 

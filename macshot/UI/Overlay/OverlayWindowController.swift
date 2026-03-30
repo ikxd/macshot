@@ -1,7 +1,7 @@
 import Cocoa
+import CoreImage
 import UniformTypeIdentifiers
 import Vision
-import CoreImage
 
 @MainActor
 protocol OverlayWindowControllerDelegate: AnyObject {
@@ -10,9 +10,11 @@ protocol OverlayWindowControllerDelegate: AnyObject {
     func overlayDidRequestPin(_ controller: OverlayWindowController, image: NSImage)
     func overlayDidRequestOCR(_ controller: OverlayWindowController, text: String, image: NSImage?)
     func overlayDidRequestUpload(_ controller: OverlayWindowController, image: NSImage)
-    func overlayDidRequestStartRecording(_ controller: OverlayWindowController, rect: NSRect, screen: NSScreen)
+    func overlayDidRequestStartRecording(
+        _ controller: OverlayWindowController, rect: NSRect, screen: NSScreen)
     func overlayDidRequestStopRecording(_ controller: OverlayWindowController)
-    func overlayDidRequestScrollCapture(_ controller: OverlayWindowController, rect: NSRect, screen: NSScreen)
+    func overlayDidRequestScrollCapture(
+        _ controller: OverlayWindowController, rect: NSRect, screen: NSScreen)
     func overlayDidRequestStopScrollCapture(_ controller: OverlayWindowController)
     func overlayDidBeginSelection(_ controller: OverlayWindowController)
     func overlayDidChangeSelection(_ controller: OverlayWindowController, globalRect: NSRect)
@@ -34,7 +36,9 @@ class OverlayWindowController {
     private var shareDelegate: SharePickerDelegate?
     private weak var sharePanel: NSPanel?
     private var shareDismissTime: Date = .distantPast
-    var windowNumber: CGWindowID { overlayWindow.map { CGWindowID($0.windowNumber) } ?? CGWindowID.max }
+    var windowNumber: CGWindowID {
+        overlayWindow.map { CGWindowID($0.windowNumber) } ?? CGWindowID.max
+    }
     private(set) var screen: NSScreen = NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
     var screenshotImage: NSImage? { overlayView?.screenshotImage }
     var selectionRect: NSRect { overlayView?.selectionRect ?? .zero }
@@ -55,7 +59,7 @@ class OverlayWindowController {
             backing: .buffered,
             defer: false
         )
-        window.level = .statusBar + 1
+        window.level = NSWindow.Level(257)  // above modal panels, alerts, and security popups
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
@@ -78,6 +82,12 @@ class OverlayWindowController {
 
     func showOverlay() {
         guard let window = overlayWindow else { return }
+        // Force the view to render into its backing store before showing the window.
+        // This ensures the screenshot is fully drawn when the window appears,
+        // preventing a flash of the deactivating app underneath.
+        if let view = overlayView {
+            view.displayIfNeeded()
+        }
         window.makeKeyAndOrderFront(nil)
         if let view = overlayView {
             window.makeFirstResponder(view)
@@ -142,7 +152,8 @@ class OverlayWindowController {
 
     /// Auto-start recording immediately (used when timer + fullscreen record).
     func autoStartRecording() {
-        overlayView?.overlayDelegate?.overlayViewDidRequestStartRecording(rect: overlayView?.selectionRect ?? .zero)
+        overlayView?.overlayDelegate?.overlayViewDidRequestStartRecording(
+            rect: overlayView?.selectionRect ?? .zero)
     }
 
     func setScrollCaptureState(isActive: Bool, stripCount: Int = 0, pixelSize: CGSize = .zero) {
@@ -152,13 +163,13 @@ class OverlayWindowController {
             overlayView?.stopScrollCaptureMode()
         }
         overlayView?.scrollCaptureStripCount = stripCount
-        overlayView?.scrollCapturePixelSize  = pixelSize
+        overlayView?.scrollCapturePixelSize = pixelSize
         overlayView?.needsDisplay = true
     }
 
     func updateScrollCaptureProgress(stripCount: Int, pixelSize: CGSize) {
         overlayView?.scrollCaptureStripCount = stripCount
-        overlayView?.scrollCapturePixelSize  = pixelSize
+        overlayView?.scrollCapturePixelSize = pixelSize
         overlayView?.updateScrollCaptureHUD()
         overlayView?.needsDisplay = true
     }
@@ -178,10 +189,12 @@ class OverlayWindowController {
 
     private func saveSelectionIfNeeded() {
         guard UserDefaults.standard.bool(forKey: "rememberLastSelection"),
-              let view = overlayView, view.state == .selected,
-              view.selectionRect.width > 1, view.selectionRect.height > 1 else { return }
+            let view = overlayView, view.state == .selected,
+            view.selectionRect.width > 1, view.selectionRect.height > 1
+        else { return }
         UserDefaults.standard.set(NSStringFromRect(view.selectionRect), forKey: "lastSelectionRect")
-        UserDefaults.standard.set(NSStringFromRect(screen.frame), forKey: "lastSelectionScreenFrame")
+        UserDefaults.standard.set(
+            NSStringFromRect(screen.frame), forKey: "lastSelectionScreenFrame")
     }
 
     private func playCopySound() {
@@ -192,7 +205,8 @@ class OverlayWindowController {
     }
 
     private func captureRegion() -> NSImage? {
-        return overlayDelegate?.overlayCrossScreenImage(self) ?? overlayView?.captureSelectedRegion()
+        return overlayDelegate?.overlayCrossScreenImage(self)
+            ?? overlayView?.captureSelectedRegion()
     }
 
     private func applyBeautifyIfNeeded(_ image: NSImage?) -> NSImage? {
@@ -228,9 +242,10 @@ extension OverlayWindowController: OverlayViewDelegate {
 
     func overlayViewSelectionDidChange(_ rect: NSRect) {
         let screenOrigin = screen.frame.origin
-        let globalRect = NSRect(x: rect.origin.x + screenOrigin.x,
-                                y: rect.origin.y + screenOrigin.y,
-                                width: rect.width, height: rect.height)
+        let globalRect = NSRect(
+            x: rect.origin.x + screenOrigin.x,
+            y: rect.origin.y + screenOrigin.y,
+            width: rect.width, height: rect.height)
         overlayDelegate?.overlayDidChangeSelection(self, globalRect: globalRect)
     }
 
@@ -242,16 +257,38 @@ extension OverlayWindowController: OverlayViewDelegate {
     func overlayViewDidConfirm() {
         let autoCopy = UserDefaults.standard.object(forKey: "autoCopyToClipboard") as? Bool ?? true
 
-        var capturedImage = captureRegion()
-        capturedImage = applyBeautifyIfNeeded(capturedImage)
+        // Snapshot post-processing config before dismissing (view will be torn down)
+        let hasEffects = overlayView?.effectsActive ?? false
+        let effectsCfg = overlayView?.effectsConfig ?? ImageEffectsConfig()
+        let hasBeautify = overlayView?.beautifyEnabled ?? false
+        let beautifyCfg = overlayView?.beautifyConfig ?? BeautifyConfig()
 
-        if autoCopy, let image = capturedImage {
-            copyImageToClipboard(image)
+        // Capture the raw composited image
+        guard let rawImage = captureRegion() else {
+            dismiss()
+            overlayDelegate?.overlayDidCancel(self)
+            return
         }
 
+        // Dismiss immediately — user is free to continue working
         playCopySound()
         dismiss()
-        overlayDelegate?.overlayDidConfirm(self, capturedImage: capturedImage)
+
+        // Apply post-processing if needed
+        var finalImage = rawImage
+        if hasEffects {
+            finalImage = ImageEffects.apply(to: finalImage, config: effectsCfg)
+        }
+        if hasBeautify {
+            finalImage = BeautifyRenderer.render(image: finalImage, config: beautifyCfg)
+        }
+
+        // Clipboard copy is now instant (lazy encoding via writeObjects)
+        if autoCopy {
+            ImageEncoder.copyToClipboard(finalImage)
+        }
+
+        overlayDelegate?.overlayDidConfirm(self, capturedImage: finalImage)
     }
 
     func overlayViewDidRequestPin() {
@@ -264,7 +301,9 @@ extension OverlayWindowController: OverlayViewDelegate {
 
     func overlayViewDidRequestOCR() {
         guard let image = captureRegion() else { return }
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return
+        }
 
         let request = VisionOCR.makeTextRecognitionRequest { [weak self] request, error in
             guard let self = self else { return }
@@ -310,7 +349,8 @@ extension OverlayWindowController: OverlayViewDelegate {
         image = applyBeautifyIfNeeded(image) ?? image
         guard let imageData = ImageEncoder.encode(image) else { return }
         let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("macshot_\(Self.formattedTimestamp()).\(ImageEncoder.fileExtension)")
+            .appendingPathComponent(
+                "macshot_\(Self.formattedTimestamp()).\(ImageEncoder.fileExtension)")
         try? imageData.write(to: tempURL)
 
         // Get the screen position of the share button
@@ -356,7 +396,8 @@ extension OverlayWindowController: OverlayViewDelegate {
         )
         shareDelegate = delegate
         picker.delegate = delegate
-        picker.show(relativeTo: panel.contentView!.bounds, of: panel.contentView!, preferredEdge: .minX)
+        picker.show(
+            relativeTo: panel.contentView!.bounds, of: panel.contentView!, preferredEdge: .minX)
     }
 
     func overlayViewDidRequestEnterRecordingMode() {
@@ -401,17 +442,19 @@ extension OverlayWindowController: OverlayViewDelegate {
     func overlayViewRemoteSelectionDidChange(_ rect: NSRect) {
         // Convert local rect to global screen coords and forward to delegate
         let screenOrigin = screen.frame.origin
-        let globalRect = NSRect(x: rect.origin.x + screenOrigin.x,
-                                y: rect.origin.y + screenOrigin.y,
-                                width: rect.width, height: rect.height)
+        let globalRect = NSRect(
+            x: rect.origin.x + screenOrigin.x,
+            y: rect.origin.y + screenOrigin.y,
+            width: rect.width, height: rect.height)
         overlayDelegate?.overlayDidRemoteResizeSelection(self, globalRect: globalRect)
     }
 
     func overlayViewRemoteSelectionDidFinish(_ rect: NSRect) {
         let screenOrigin = screen.frame.origin
-        let globalRect = NSRect(x: rect.origin.x + screenOrigin.x,
-                                y: rect.origin.y + screenOrigin.y,
-                                width: rect.width, height: rect.height)
+        let globalRect = NSRect(
+            x: rect.origin.x + screenOrigin.x,
+            y: rect.origin.y + screenOrigin.y,
+            width: rect.width, height: rect.height)
         overlayDelegate?.overlayDidFinishRemoteResize(self, globalRect: globalRect)
     }
 
@@ -420,15 +463,18 @@ extension OverlayWindowController: OverlayViewDelegate {
         let sel = view.selectionRect
 
         // Use stitched cross-screen image if available, otherwise crop from single screen.
-        let croppedImage: NSImage? = overlayDelegate?.overlayCrossScreenImage(self) ?? {
-            guard let src = view.screenshotImage else { return nil }
-            let img = NSImage(size: sel.size, flipped: false) { _ in
-                src.draw(in: NSRect(origin: .zero, size: sel.size),
-                         from: sel, operation: .copy, fraction: 1.0)
-                return true
-            }
-            return img
-        }()
+        let croppedImage: NSImage? =
+            overlayDelegate?.overlayCrossScreenImage(self)
+            ?? {
+                guard let src = view.screenshotImage else { return nil }
+                let img = NSImage(size: sel.size, flipped: false) { _ in
+                    src.draw(
+                        in: NSRect(origin: .zero, size: sel.size),
+                        from: sel, operation: .copy, fraction: 1.0)
+                    return true
+                }
+                return img
+            }()
         guard let image = croppedImage else { return }
 
         // Clone annotations and shift them from overlay coords to image-relative (0,0) origin.
@@ -445,46 +491,61 @@ extension OverlayWindowController: OverlayViewDelegate {
 
         dismiss()
         overlayDelegate?.overlayDidCancel(self)
-        DetachedEditorWindowController.open(image: image, tool: tool, color: color, strokeWidth: stroke, annotations: shiftedAnnotations)
+        DetachedEditorWindowController.open(
+            image: image, tool: tool, color: color, strokeWidth: stroke,
+            annotations: shiftedAnnotations)
     }
 
     @available(macOS 14.0, *)
     func overlayViewDidRequestRemoveBackground() {
         guard var image = captureRegion() else { return }
         image = applyBeautifyIfNeeded(image) ?? image
-        
+
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return
         }
-        
+
         let request = VNGenerateForegroundInstanceMaskRequest()
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        
+
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 try handler.perform([request])
-                guard let result = request.results?.first else { throw NSError(domain: "Macshot", code: 1) }
-                
-                let maskPixelBuffer = try result.generateScaledMaskForImage(forInstances: result.allInstances, from: handler)
-                
+                guard let result = request.results?.first else {
+                    throw NSError(domain: "Macshot", code: 1)
+                }
+
+                let maskPixelBuffer = try result.generateScaledMaskForImage(
+                    forInstances: result.allInstances, from: handler)
+
                 let originalCIImage = CIImage(cgImage: cgImage)
                 let maskCIImage = CIImage(cvPixelBuffer: maskPixelBuffer)
-                
+
                 // Blend original with mask
-                guard let filter = CIFilter(name: "CIBlendWithMask") else { throw NSError(domain: "Macshot", code: 2) }
+                guard let filter = CIFilter(name: "CIBlendWithMask") else {
+                    throw NSError(domain: "Macshot", code: 2)
+                }
                 filter.setValue(originalCIImage, forKey: kCIInputImageKey)
                 filter.setValue(maskCIImage, forKey: kCIInputMaskImageKey)
-                filter.setValue(CIImage(color: .clear).cropped(to: originalCIImage.extent), forKey: kCIInputBackgroundImageKey)
-                
-                guard let outputCIImage = filter.outputImage else { throw NSError(domain: "Macshot", code: 3) }
-                
+                filter.setValue(
+                    CIImage(color: .clear).cropped(to: originalCIImage.extent),
+                    forKey: kCIInputBackgroundImageKey)
+
+                guard let outputCIImage = filter.outputImage else {
+                    throw NSError(domain: "Macshot", code: 3)
+                }
+
                 let context = CIContext()
-                guard let finalCGImage = context.createCGImage(outputCIImage, from: outputCIImage.extent) else { throw NSError(domain: "Macshot", code: 4) }
-                
+                guard
+                    let finalCGImage = context.createCGImage(
+                        outputCIImage, from: outputCIImage.extent)
+                else { throw NSError(domain: "Macshot", code: 4) }
+
                 let finalNSImage = NSImage(cgImage: finalCGImage, size: image.size)
-                
+
                 DispatchQueue.main.async {
-                    let autoCopy = UserDefaults.standard.object(forKey: "autoCopyToClipboard") as? Bool ?? true
+                    let autoCopy =
+                        UserDefaults.standard.object(forKey: "autoCopyToClipboard") as? Bool ?? true
                     if autoCopy {
                         self.copyImageToClipboard(finalNSImage)
                     }
@@ -494,10 +555,11 @@ extension OverlayWindowController: OverlayViewDelegate {
                 }
             } catch {
                 #if DEBUG
-                print("Vision background removal error: \(error.localizedDescription)")
+                    print("Vision background removal error: \(error.localizedDescription)")
                 #endif
                 DispatchQueue.main.async {
-                    self.overlayView?.showOverlayError("Background removal failed — no clear subject found.")
+                    self.overlayView?.showOverlayError(
+                        "Background removal failed — no clear subject found.")
                 }
             }
         }
@@ -510,40 +572,56 @@ extension OverlayWindowController: OverlayViewDelegate {
             return
         }
 
-        let copyMode = UserDefaults.standard.object(forKey: "quickModeCopyToClipboard") as? Bool ?? false
+        let copyMode =
+            UserDefaults.standard.object(forKey: "quickModeCopyToClipboard") as? Bool ?? true
 
         if copyMode {
-            copyImageToClipboard(image)
+            ImageEncoder.copyToClipboard(image)
             playCopySound()
             dismiss()
             overlayDelegate?.overlayDidConfirm(self, capturedImage: image)
         } else {
-            // Dismiss immediately for responsiveness, then save in background
             playCopySound()
             dismiss()
             overlayDelegate?.overlayDidConfirm(self, capturedImage: image)
+            saveImageToDirectory(image)
+        }
+    }
 
-            let dirURL = SaveDirectoryAccess.resolve()
+    func overlayViewDidRequestFileSave() {
+        guard let image = captureRegion() else {
+            dismiss()
+            overlayDelegate?.overlayDidCancel(self)
+            return
+        }
 
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-            let timestamp = formatter.string(from: Date())
-            let useWindowTitle = UserDefaults.standard.bool(forKey: "useWindowTitleInFilename")
-            let filename: String
-            if useWindowTitle, let title = capturedWindowTitle {
-                let safe = title.replacingOccurrences(of: "/", with: "-")
-                    .replacingOccurrences(of: ":", with: "-")
-                filename = "Screenshot \(timestamp) — \(safe).\(ImageEncoder.fileExtension)"
-            } else {
-                filename = "Screenshot \(timestamp).\(ImageEncoder.fileExtension)"
-            }
-            let fileURL = dirURL.appendingPathComponent(filename)
+        playCopySound()
+        dismiss()
+        overlayDelegate?.overlayDidConfirm(self, capturedImage: image)
+        saveImageToDirectory(image)
+    }
 
-            DispatchQueue.global(qos: .userInitiated).async {
-                guard let imageData = ImageEncoder.encode(image) else { return }
-                try? imageData.write(to: fileURL)
-                SaveDirectoryAccess.stopAccessing(url: dirURL)
-            }
+    private func saveImageToDirectory(_ image: NSImage) {
+        let dirURL = SaveDirectoryAccess.resolve()
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        let timestamp = formatter.string(from: Date())
+        let useWindowTitle = UserDefaults.standard.bool(forKey: "useWindowTitleInFilename")
+        let filename: String
+        if useWindowTitle, let title = capturedWindowTitle {
+            let safe = title.replacingOccurrences(of: "/", with: "-")
+                .replacingOccurrences(of: ":", with: "-")
+            filename = "Screenshot \(timestamp) — \(safe).\(ImageEncoder.fileExtension)"
+        } else {
+            filename = "Screenshot \(timestamp).\(ImageEncoder.fileExtension)"
+        }
+        let fileURL = dirURL.appendingPathComponent(filename)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let imageData = ImageEncoder.encode(image) else { return }
+            try? imageData.write(to: fileURL)
+            SaveDirectoryAccess.stopAccessing(url: dirURL)
         }
     }
 
@@ -554,8 +632,9 @@ extension OverlayWindowController: OverlayViewDelegate {
 
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [ImageEncoder.utType]
-        savePanel.nameFieldStringValue = "macshot_\(Self.formattedTimestamp()).\(ImageEncoder.fileExtension)"
-        savePanel.level = .statusBar + 3
+        savePanel.nameFieldStringValue =
+            "macshot_\(Self.formattedTimestamp()).\(ImageEncoder.fileExtension)"
+        savePanel.level = NSWindow.Level(258)
 
         savePanel.directoryURL = SaveDirectoryAccess.directoryHint()
 
@@ -593,7 +672,9 @@ private class SharePickerDelegate: NSObject, NSSharingServicePickerDelegate {
         self.onDismiss = onDismiss
     }
 
-    func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?) {
+    func sharingServicePicker(
+        _ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?
+    ) {
         if service != nil {
             onPick()
         } else {
@@ -601,4 +682,3 @@ private class SharePickerDelegate: NSObject, NSSharingServicePickerDelegate {
         }
     }
 }
-

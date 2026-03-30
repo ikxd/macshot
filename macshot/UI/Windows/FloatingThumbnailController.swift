@@ -5,16 +5,21 @@ class FloatingThumbnailController: NSObject, NSDraggingSource {
 
     private var window: NSPanel?
     private var dismissTask: DispatchWorkItem?
-    private let image: NSImage
+    let image: NSImage
     private var thumbnailView: ThumbnailView?
+    /// The intended final frame — used instead of window.frame to avoid reading
+    /// intermediate positions during slide-in or reflow animations.
+    private var targetFrame: NSRect = .zero
     var onDismiss: (() -> Void)?
 
     // Action callbacks
-    var onCopy:   (() -> Void)?
-    var onSave:   (() -> Void)?
-    var onPin:    (() -> Void)?
-    var onEdit:   (() -> Void)?
-    var onUpload: (() -> Void)?
+    var onCopy:     (() -> Void)?
+    var onSave:     (() -> Void)?
+    var onPin:      (() -> Void)?
+    var onEdit:     (() -> Void)?
+    var onUpload:   (() -> Void)?
+    var onCloseAll: (() -> Void)?
+    var onSaveAll:  (() -> Void)?
 
     init(image: NSImage) {
         self.image = image
@@ -80,12 +85,14 @@ class FloatingThumbnailController: NSObject, NSDraggingSource {
         view.autoresizingMask = [.width, .height]
 
         view.onDragStarted = { [weak self] event in self?.startDrag(event: event) }
-        view.onClose  = { [weak self] in self?.dismiss() }
-        view.onCopy   = { [weak self] in self?.onCopy?();   self?.dismiss() }
-        view.onSave   = { [weak self] in self?.onSave?();   self?.dismiss() }
-        view.onPin    = { [weak self] in self?.onPin?();    self?.dismiss() }
-        view.onEdit   = { [weak self] in self?.onEdit?();   self?.dismiss() }
-        view.onUpload = { [weak self] in self?.onUpload?(); self?.dismiss() }
+        view.onClose    = { [weak self] in self?.dismiss() }
+        view.onCopy     = { [weak self] in self?.onCopy?();     self?.dismiss() }
+        view.onSave     = { [weak self] in self?.onSave?();     self?.dismiss() }
+        view.onPin      = { [weak self] in self?.onPin?();      self?.dismiss() }
+        view.onEdit     = { [weak self] in self?.onEdit?();     self?.dismiss() }
+        view.onUpload   = { [weak self] in self?.onUpload?();   self?.dismiss() }
+        view.onCloseAll = { [weak self] in self?.onCloseAll?() }
+        view.onSaveAll  = { [weak self] in self?.onSaveAll?() }
         view.onHoverEnter = { [weak self] in self?.pauseAutoDismiss() }
         view.onHoverExit  = { [weak self] in self?.scheduleAutoDismiss() }
 
@@ -93,15 +100,15 @@ class FloatingThumbnailController: NSObject, NSDraggingSource {
         self.window = panel
         self.thumbnailView = view
 
+        let finalFrame = NSRect(x: finalX, y: finalY, width: thumbSize.width, height: thumbSize.height)
+        targetFrame = finalFrame
+
         panel.orderFrontRegardless()
 
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.3
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(
-                NSRect(x: finalX, y: finalY, width: thumbSize.width, height: thumbSize.height),
-                display: true
-            )
+            panel.animator().setFrame(finalFrame, display: true)
         })
 
         scheduleAutoDismiss()
@@ -133,20 +140,18 @@ class FloatingThumbnailController: NSObject, NSDraggingSource {
         onDismiss = nil
     }
 
-    var windowFrame: NSRect { window?.frame ?? .zero }
+    var windowFrame: NSRect { targetFrame }
 
     /// Animate this thumbnail to a new Y position (used when a lower thumbnail is dismissed).
     func moveTo(y: CGFloat) {
         guard let window = window else { return }
-        let f = window.frame
-        guard f.minY != y else { return }
+        guard targetFrame.minY != y else { return }
+        let newFrame = NSRect(x: targetFrame.minX, y: y, width: targetFrame.width, height: targetFrame.height)
+        targetFrame = newFrame
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.25
             ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            window.animator().setFrame(
-                NSRect(x: f.minX, y: y, width: f.width, height: f.height),
-                display: true
-            )
+            window.animator().setFrame(newFrame, display: true)
         }
     }
 
@@ -194,12 +199,14 @@ class FloatingThumbnailController: NSObject, NSDraggingSource {
 private class ThumbnailView: NSView {
 
     var onDragStarted: ((NSEvent) -> Void)?
-    var onClose:  (() -> Void)?
-    var onCopy:   (() -> Void)?
-    var onSave:   (() -> Void)?
-    var onPin:    (() -> Void)?
-    var onEdit:   (() -> Void)?
-    var onUpload: (() -> Void)?
+    var onClose:    (() -> Void)?
+    var onCopy:     (() -> Void)?
+    var onSave:     (() -> Void)?
+    var onPin:      (() -> Void)?
+    var onEdit:     (() -> Void)?
+    var onUpload:   (() -> Void)?
+    var onCloseAll: (() -> Void)?
+    var onSaveAll:  (() -> Void)?
     var onHoverEnter: (() -> Void)?
     var onHoverExit:  (() -> Void)?
 
@@ -422,4 +429,18 @@ private class ThumbnailView: NSView {
         // Click anywhere else on thumbnail — dismiss
         if isHovering { onClose?() }
     }
+
+    override func rightMouseDown(with event: NSEvent) {
+        let menu = NSMenu()
+        let closeAll = NSMenuItem(title: "Close All", action: #selector(closeAllAction), keyEquivalent: "")
+        closeAll.target = self
+        let saveAll = NSMenuItem(title: "Save All to Folder…", action: #selector(saveAllAction), keyEquivalent: "")
+        saveAll.target = self
+        menu.addItem(closeAll)
+        menu.addItem(saveAll)
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc private func closeAllAction() { onCloseAll?() }
+    @objc private func saveAllAction()  { onSaveAll?() }
 }

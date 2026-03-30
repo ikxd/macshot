@@ -476,8 +476,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
 
-            NSApp.activate(ignoringOtherApps: true)
-
             for capture in captures {
                 let controller = OverlayWindowController(capture: capture)
                 controller.overlayDelegate = self
@@ -508,6 +506,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 self.overlayControllers.append(controller)
             }
+
+            CATransaction.flush()
+            NSApp.activate(ignoringOtherApps: true)
+
             self.pendingRecordMode = false
             self.pendingFullScreenRecordAutoStart = false
             self.pendingOCRMode = false
@@ -623,8 +625,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ScreenshotHistory.shared.add(image: image)
             self.showUploadProgress(image: image)
         }
+        controller.onCloseAll = { [weak self] in
+            guard let self = self else { return }
+            let all = self.thumbnailControllers
+            self.thumbnailControllers.removeAll()
+            for c in all { c.dismiss() }
+        }
+        controller.onSaveAll = { [weak self] in
+            self?.saveAllThumbnailsToFolder()
+        }
         thumbnailControllers.append(controller)
         controller.show(atY: yOrigin)
+    }
+
+    private func saveAllThumbnailsToFolder() {
+        let images = thumbnailControllers.map { $0.image }
+        guard !images.isEmpty else { return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Save Here"
+        panel.message = "Choose a folder to save \(images.count) screenshot\(images.count == 1 ? "" : "s")"
+        panel.level = .floating
+
+        panel.begin { [weak self] response in
+            guard response == .OK, let dirURL = panel.url else { return }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+
+            DispatchQueue.global(qos: .userInitiated).async {
+                for (i, image) in images.enumerated() {
+                    guard let data = ImageEncoder.encode(image) else { continue }
+                    let timestamp = formatter.string(from: Date())
+                    let filename = "Screenshot \(timestamp)-\(i + 1).\(ImageEncoder.fileExtension)"
+                    let fileURL = dirURL.appendingPathComponent(filename)
+                    try? data.write(to: fileURL)
+                }
+                DispatchQueue.main.async {
+                    self?.playCopySound()
+                    let all = self?.thumbnailControllers ?? []
+                    self?.thumbnailControllers.removeAll()
+                    for c in all { c.dismiss() }
+                }
+            }
+        }
     }
 
     private func reflowThumbnails() {

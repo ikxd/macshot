@@ -100,6 +100,12 @@ enum PopoverHelper {
 
     static var isVisible: Bool { activePopover?.isShown == true }
 
+    static var isMouseInsidePopover: Bool {
+        guard let popover = activePopover, popover.isShown,
+              let popoverWindow = popover.contentViewController?.view.window else { return false }
+        return popoverWindow.frame.contains(NSEvent.mouseLocation)
+    }
+
     /// Wrap content view so the popover always shows an arrow cursor regardless of active tool.
     private static func cursorWrapped(_ contentView: NSView) -> NSView {
         let wrapper = ArrowCursorView(frame: contentView.frame)

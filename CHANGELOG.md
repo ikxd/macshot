@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.4.5] - 2026-03-31
+
+### Added
+- **Thumbnail right-click menu** — right-click any floating thumbnail preview to "Close All" or "Save All to Folder…" for batch operations.
+
+### Changed
+- **Overlay window level raised** — overlay now appears above modal panels, alerts, and security software popups (e.g. LuLu firewall).
+- **Enter/quick-capture defaults to clipboard** — new installs default to copy-to-clipboard instead of save-to-file on Enter.
+- **Instant clipboard copy** — clipboard copy uses lazy encoding via `writeObjects`, making it instant regardless of image format.
+- **Confirm dismisses immediately** — the overlay closes before post-processing (effects/beautify), so the user can continue working sooner.
+- **History always saves as PNG** — screenshot history uses PNG internally regardless of the configured save format, eliminating slow WebP/HEIC encodes on clipboard-only captures.
+
+### Fixed
+- **Save button always saves to file** — the "Save" toolbar button now always saves to the configured directory, independent of the Enter/quick-capture preference.
+- **Save As / stamp file picker hidden behind overlay** — file dialogs now appear above the overlay window (level 258).
+- **WebP encoding corruption** — fixed broken WebP output caused by Swift-WebP's macOS encoder using wrong stride (RGB instead of RGBA) and logical size instead of pixel dimensions. Now uses the CGImage RGBA path directly.
+- **Floating thumbnail stuck mid-slide** — fixed thumbnails getting stuck partway through their slide-in animation when taking rapid screenshots, caused by `moveTo` reading an in-flight animation position.
+- **List picker hover glitch on scroll** — fixed hover highlights getting stuck on multiple rows when scrolling the language picker (or other list popovers) with the scroll wheel.
+- **Tool cursor shown over popovers** — popovers now always show the arrow cursor instead of the active tool's cursor.
+- **CATransaction flush before activate** — overlay windows render before app activation to prevent a flash of the deactivating app underneath.
+
 ## [3.4.4] - 2026-03-30
 
 ### Added
