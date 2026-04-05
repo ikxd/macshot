@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (\U2318, \U2325, \U2303, \U21E7) to set a shortcut." = "Klikk \"Ta opp\" og trykk en tastekombinasjon med minst \U00E9n modifikator (\U2318, \U2325, \U2303, \U21E7) for \U00E5 angi en snarvei.";
+
+/* Recording — GIF Processing */
+"Processing GIF\U2026" = "Behandler GIF\U2026";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Inngangsoverv\U00E5king p\U00E5krevd";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot trenger tillatelse for inngangsoverv\U00E5king for \U00E5 vise tastetrykk under opptak. Gi tilgang i System Settings, og pr\U00F8v igjen.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot trenger tilgjengelighetstillatelse for \U00E5 vise tastetrykk under opptak. Gi tilgang i System Settings, og pr\U00F8v igjen.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Vis tastetrykk";
+"Shortcuts Only" = "Kun snarveier";
+"All Keystrokes" = "Alle tastetrykk";
+
+/* Recording — Settings Popover */
+"Delay:" = "Forsinkelse:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Kopiert til utklippstavlen!";

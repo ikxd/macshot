@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "I-click ang \"Record\" at pindutin ang isang kombinasyon ng key na may kahit isang modifier (⌘, ⌥, ⌃, ⇧) upang magtakda ng shortcut.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Pinoproseso ang GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Kinakailangan ang Input Monitoring";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "Kailangan ng macshot ang Input Monitoring permission upang ipakita ang mga keystroke habang nagre-record. Pakibigyan ng access sa System Settings, pagkatapos ay subukang muli.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "Kailangan ng macshot ang Accessibility permission upang ipakita ang mga keystroke habang nagre-record. Pakibigyan ng access sa System Settings, pagkatapos ay subukang muli.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Ipakita ang mga Keystroke";
+"Shortcuts Only" = "Mga Shortcut Lamang";
+"All Keystrokes" = "Lahat ng Keystroke";
+
+/* Recording — Settings Popover */
+"Delay:" = "Pagkaantala:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Nakopya sa clipboard!";

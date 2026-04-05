@@ -383,3 +383,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Clicca \"Registra\" e premi una combinazione di tasti con almeno un modificatore (⌘, ⌥, ⌃, ⇧) per impostare una scorciatoia.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Elaborazione GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Monitoraggio input richiesto";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot ha bisogno del permesso Monitoraggio input per mostrare i tasti premuti durante la registrazione. Concedi l'accesso nelle Impostazioni di Sistema, poi riprova.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot ha bisogno del permesso Accessibilità per mostrare i tasti premuti durante la registrazione. Concedi l'accesso nelle Impostazioni di Sistema, poi riprova.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Mostra tasti premuti";
+"Shortcuts Only" = "Solo scorciatoie";
+"All Keystrokes" = "Tutti i tasti";
+
+/* Recording — Settings Popover */
+"Delay:" = "Ritardo:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Copiato negli appunti!";

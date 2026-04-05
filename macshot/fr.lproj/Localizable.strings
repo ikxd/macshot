@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Cliquez sur « Enregistrer » et appuyez sur une combinaison de touches avec au moins un modificateur (⌘, ⌥, ⌃, ⇧) pour définir un raccourci.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Traitement du GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Surveillance des entrées requise";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot a besoin de l'autorisation Surveillance des entrées pour afficher les frappes pendant l'enregistrement. Veuillez accorder l'accès dans System Settings, puis réessayez.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot a besoin de l'autorisation Accessibilité pour afficher les frappes pendant l'enregistrement. Veuillez accorder l'accès dans System Settings, puis réessayez.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Afficher les frappes";
+"Shortcuts Only" = "Raccourcis uniquement";
+"All Keystrokes" = "Toutes les frappes";
+
+/* Recording — Settings Popover */
+"Delay:" = "Délai :";
+
+/* Video Editor */
+"Copied to clipboard!" = "Copié dans le presse-papiers !";

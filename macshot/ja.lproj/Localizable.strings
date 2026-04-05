@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "「録画」をクリックし、修飾キー (⌘, ⌥, ⌃, ⇧) を1つ以上含むキーの組み合わせを押して、ショートカットを設定してください。";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "GIF を処理中…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "入力監視の許可が必要です";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot が録画中にキー入力を表示するには、入力監視の許可が必要です。システム設定でアクセスを許可してから、もう一度お試しください。";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot が録画中にキー入力を表示するには、アクセシビリティの許可が必要です。システム設定でアクセスを許可してから、もう一度お試しください。";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "キー入力を表示";
+"Shortcuts Only" = "ショートカットのみ";
+"All Keystrokes" = "すべてのキー入力";
+
+/* Recording — Settings Popover */
+"Delay:" = "遅延:";
+
+/* Video Editor */
+"Copied to clipboard!" = "クリップボードにコピーしました!";

@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Nhấp \"Quay\" và nhấn tổ hợp phím với ít nhất một phím bổ trợ (⌘, ⌥, ⌃, ⇧) để đặt phím tắt.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Đang xử lý GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Yêu cầu quyền Giám sát đầu vào";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot cần quyền Giám sát đầu vào để hiển thị phím bấm trong khi quay. Vui lòng cấp quyền trong System Settings, rồi thử lại.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot cần quyền Trợ năng để hiển thị phím bấm trong khi quay. Vui lòng cấp quyền trong System Settings, rồi thử lại.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Hiển thị phím bấm";
+"Shortcuts Only" = "Chỉ phím tắt";
+"All Keystrokes" = "Tất cả phím bấm";
+
+/* Recording — Settings Popover */
+"Delay:" = "Trì hoãn:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Đã sao chép vào bộ nhớ tạm!";

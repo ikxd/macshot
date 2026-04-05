@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Kattints a \"Felvétel\" gombra, és nyomj meg egy billentyűkombinációt legalább egy módosítóval (⌘, ⌥, ⌃, ⇧) a gyorsbillentyű beállításához.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "GIF feldolgozása…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Bevitelfigyelés szükséges";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "A macshot-nak Bevitelfigyelés engedélyre van szüksége a billentyűleütések megjelenítéséhez felvétel közben. Kérlek, adj hozzáférést a System Settings-ben, majd próbáld újra.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "A macshot-nak Akadálymentesítési engedélyre van szüksége a billentyűleütések megjelenítéséhez felvétel közben. Kérlek, adj hozzáférést a System Settings-ben, majd próbáld újra.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Billentyűleütések megjelenítése";
+"Shortcuts Only" = "Csak gyorsbillentyűk";
+"All Keystrokes" = "Összes billentyűleütés";
+
+/* Recording — Settings Popover */
+"Delay:" = "Késleltetés:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Vágólapra másolva!";

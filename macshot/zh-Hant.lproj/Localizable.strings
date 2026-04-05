@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "點按 \"錄製\" 並按下包含至少一個修飾鍵（⌘、⌥、⌃、⇧）的組合鍵來設定快捷鍵。";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "正在處理 GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "需要輸入監控權限";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot 需要「輸入監控」權限才能在錄製時顯示按鍵。請在 System Settings 中授予權限，然後再試一次。";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot 需要「輔助使用」權限才能在錄製時顯示按鍵。請在 System Settings 中授予權限，然後再試一次。";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "顯示按鍵";
+"Shortcuts Only" = "僅快捷鍵";
+"All Keystrokes" = "所有按鍵";
+
+/* Recording — Settings Popover */
+"Delay:" = "延遲：";
+
+/* Video Editor */
+"Copied to clipboard!" = "已拷貝至剪貼簿！";

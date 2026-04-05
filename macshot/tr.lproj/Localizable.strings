@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Bir kısayol ayarlamak için \"Kayıt\" düğmesine tıklayın ve en az bir değiştirici tuş (⌘, ⌥, ⌃, ⇧) içeren bir tuş kombinasyonuna basın.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "GIF işleniyor…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Giriş İzleme Gerekli";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot, kayıt sırasında tuş vuruşlarını göstermek için Giriş İzleme iznine ihtiyaç duyar. Lütfen System Settings'ten izin verin ve tekrar deneyin.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot, kayıt sırasında tuş vuruşlarını göstermek için Erişilebilirlik iznine ihtiyaç duyar. Lütfen System Settings'ten izin verin ve tekrar deneyin.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Tuş Vuruşlarını Göster";
+"Shortcuts Only" = "Yalnızca Kısayollar";
+"All Keystrokes" = "Tüm Tuş Vuruşları";
+
+/* Recording — Settings Popover */
+"Delay:" = "Gecikme:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Panoya kopyalandı!";

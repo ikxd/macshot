@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Klik op \"Opnemen\" en druk op een toetsencombinatie met ten minste een modifier (⌘, ⌥, ⌃, ⇧) om een sneltoets in te stellen.";
+
+/* Recording — GIF Processing */
+"Processing GIF\U2026" = "GIF verwerken\U2026";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Invoerbewaking vereist";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot heeft de toestemming Invoerbewaking nodig om toetsaanslagen te tonen tijdens de opname. Verleen toegang in System Settings en probeer het opnieuw.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot heeft de toegankelijkheidstoestemming nodig om toetsaanslagen te tonen tijdens de opname. Verleen toegang in System Settings en probeer het opnieuw.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Toetsaanslagen tonen";
+"Shortcuts Only" = "Alleen sneltoetsen";
+"All Keystrokes" = "Alle toetsaanslagen";
+
+/* Recording — Settings Popover */
+"Delay:" = "Vertraging:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Gekopieerd naar klembord!";

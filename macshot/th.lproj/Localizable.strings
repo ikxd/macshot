@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "คลิก \"บันทึก\" แล้วกดปุ่มพร้อมตัวดัดแปลงอย่างน้อยหนึ่งตัว (⌘, ⌥, ⌃, ⇧) เพื่อตั้งปุ่มลัด";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "กำลังประมวลผล GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "ต้องการสิทธิ์การตรวจสอบอินพุต";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot ต้องการสิทธิ์การตรวจสอบอินพุตเพื่อแสดงการกดปุ่มขณะบันทึก กรุณาอนุญาตใน System Settings แล้วลองอีกครั้ง";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot ต้องการสิทธิ์การช่วยการเข้าถึงเพื่อแสดงการกดปุ่มขณะบันทึก กรุณาอนุญาตใน System Settings แล้วลองอีกครั้ง";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "แสดงการกดปุ่ม";
+"Shortcuts Only" = "เฉพาะปุ่มลัด";
+"All Keystrokes" = "การกดปุ่มทั้งหมด";
+
+/* Recording — Settings Popover */
+"Delay:" = "หน่วงเวลา:";
+
+/* Video Editor */
+"Copied to clipboard!" = "คัดลอกไปยังคลิปบอร์ดแล้ว!";

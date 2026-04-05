@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Feu clic a \"Record\" i premeu una combinacio de tecles amb almenys un modificador (⌘, ⌥, ⌃, ⇧) per establir una drecera.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Processant GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Es requereix monitoratge d'entrada";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot necessita permis de monitoratge d'entrada per mostrar les pulsacions de tecles durant la gravacio. Concediu l'acces a System Settings i torneu-ho a provar.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot necessita permis d'accessibilitat per mostrar les pulsacions de tecles durant la gravacio. Concediu l'acces a System Settings i torneu-ho a provar.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Mostrar pulsacions de tecles";
+"Shortcuts Only" = "Nomes dreceres";
+"All Keystrokes" = "Totes les pulsacions";
+
+/* Recording — Settings Popover */
+"Delay:" = "Retard:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Copiat al porta-retalls!";

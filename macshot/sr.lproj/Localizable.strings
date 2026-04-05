@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Кликните \"Сними\" и притисните комбинацију тастера са најмање једним модификатором (⌘, ⌥, ⌃, ⇧) да бисте поставили пречицу.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Обрада GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Потребно праћење уноса";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot захтева дозволу за праћење уноса да би приказивао притиске тастера током снимања. Одобрите приступ у System Settings, па покушајте поново.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot захтева дозволу приступачности да би приказивао притиске тастера током снимања. Одобрите приступ у System Settings, па покушајте поново.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Прикажи притиске тастера";
+"Shortcuts Only" = "Само пречице";
+"All Keystrokes" = "Сви притисци тастера";
+
+/* Recording — Settings Popover */
+"Delay:" = "Одлагање:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Копирано у оставу!";

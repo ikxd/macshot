@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "\"Record\" ক্লিক করুন এবং শর্টকাট সেট করতে কমপক্ষে একটি মডিফায়ার (⌘, ⌥, ⌃, ⇧) সহ একটি কী সমন্বয় চাপুন।";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "GIF প্রক্রিয়া হচ্ছে…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "ইনপুট মনিটরিং প্রয়োজন";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "রেকর্ডিংয়ের সময় কীস্ট্রোক দেখাতে macshot-এর ইনপুট মনিটরিং অনুমতি প্রয়োজন। অনুগ্রহ করে System Settings-এ অ্যাক্সেস দিন, তারপর আবার চেষ্টা করুন।";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "রেকর্ডিংয়ের সময় কীস্ট্রোক দেখাতে macshot-এর অ্যাক্সেসিবিলিটি অনুমতি প্রয়োজন। অনুগ্রহ করে System Settings-এ অ্যাক্সেস দিন, তারপর আবার চেষ্টা করুন।";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "কীস্ট্রোক দেখান";
+"Shortcuts Only" = "শুধু শর্টকাট";
+"All Keystrokes" = "সব কীস্ট্রোক";
+
+/* Recording — Settings Popover */
+"Delay:" = "বিলম্ব:";
+
+/* Video Editor */
+"Copied to clipboard!" = "ক্লিপবোর্ডে কপি হয়েছে!";

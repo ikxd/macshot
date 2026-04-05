@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "குறுக்குவழியை அமைக்க \"பதிவு\" ஐ கிளிக் செய்து குறைந்தது ஒரு மாற்றி (⌘, ⌥, ⌃, ⇧) உடன் விசை கலவையை அழுத்தவும்.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "GIF செயலாக்கப்படுகிறது…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "உள்ளீட்டு கண்காணிப்பு தேவை";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "பதிவின் போது விசை அழுத்தங்களைக் காட்ட macshot க்கு உள்ளீட்டு கண்காணிப்பு அனுமதி தேவை. System Settings இல் அணுகலை வழங்கி, மீண்டும் முயற்சிக்கவும்.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "பதிவின் போது விசை அழுத்தங்களைக் காட்ட macshot க்கு அணுகல்தன்மை அனுமதி தேவை. System Settings இல் அணுகலை வழங்கி, மீண்டும் முயற்சிக்கவும்.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "விசை அழுத்தங்களைக் காட்டு";
+"Shortcuts Only" = "குறுக்குவழிகள் மட்டும்";
+"All Keystrokes" = "அனைத்து விசை அழுத்தங்களும்";
+
+/* Recording — Settings Popover */
+"Delay:" = "தாமதம்:";
+
+/* Video Editor */
+"Copied to clipboard!" = "ஒட்டுப்பலகையில் நகலெடுக்கப்பட்டது!";

@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Napsauta \"Nauhoita\" ja paina nappaimistoyhdistelmaa, jossa on vahintaan yksi muokkausnappain (⌘, ⌥, ⌃, ⇧), asettaaksesi pikanappaimen.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Käsitellään GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Syötön seuranta vaaditaan";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot tarvitsee syötön seurannan luvan näyttääkseen näppäinpainallukset nauhoituksen aikana. Myönnä käyttöoikeus System Settings -asetuksista ja yritä uudelleen.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot tarvitsee esteettömyysoikeuden näyttääkseen näppäinpainallukset nauhoituksen aikana. Myönnä käyttöoikeus System Settings -asetuksista ja yritä uudelleen.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Näytä näppäinpainallukset";
+"Shortcuts Only" = "Vain pikanäppäimet";
+"All Keystrokes" = "Kaikki näppäinpainallukset";
+
+/* Recording — Settings Popover */
+"Delay:" = "Viive:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Kopioitu leikepöydälle!";

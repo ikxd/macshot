@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Klik \"Rekam\" dan tekan kombinasi tombol dengan setidaknya satu pengubah (⌘, ⌥, ⌃, ⇧) untuk mengatur pintasan.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Memproses GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Pemantauan Input Diperlukan";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot memerlukan izin Pemantauan Input untuk menampilkan ketukan tombol selama perekaman. Berikan akses di System Settings, lalu coba lagi.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot memerlukan izin Aksesibilitas untuk menampilkan ketukan tombol selama perekaman. Berikan akses di System Settings, lalu coba lagi.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Tampilkan Ketukan Tombol";
+"Shortcuts Only" = "Pintasan Saja";
+"All Keystrokes" = "Semua Ketukan Tombol";
+
+/* Recording — Settings Popover */
+"Delay:" = "Tunda:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Disalin ke papan klip!";

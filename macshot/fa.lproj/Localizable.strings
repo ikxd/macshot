@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "روی \"ضبط ویدیو\" کلیک کنید و ترکیب کلیدی با حداقل یک کلید تغییردهنده (⌘، ⌥، ⌃، ⇧) فشار دهید تا میانبر تنظیم شود.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "در حال پردازش GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "نظارت بر ورودی لازم است";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot برای نمایش کلیدهای فشرده‌شده هنگام ضبط ویدیو به مجوز نظارت بر ورودی نیاز دارد. لطفا دسترسی را در System Settings اعطا کنید و دوباره تلاش کنید.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot برای نمایش کلیدهای فشرده‌شده هنگام ضبط ویدیو به مجوز دسترسی‌پذیری نیاز دارد. لطفا دسترسی را در System Settings اعطا کنید و دوباره تلاش کنید.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "نمایش کلیدهای فشرده‌شده";
+"Shortcuts Only" = "فقط میانبرها";
+"All Keystrokes" = "همه کلیدها";
+
+/* Recording — Settings Popover */
+"Delay:" = "تاخیر:";
+
+/* Video Editor */
+"Copied to clipboard!" = "به کلیپ‌بورد کپی شد!";

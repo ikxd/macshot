@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Kliknite \"Snimaj\" i pritisnite kombinaciju tipki s barem jednom modifikatorskom tipkom (⌘, ⌥, ⌃, ⇧) za postavljanje precaca.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Obrada GIF-a…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Potrebno pracenje unosa";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot treba dozvolu pracenja unosa za prikaz pritisaka tipki tijekom snimanja. Odobrite pristup u System Settings, zatim pokusajte ponovo.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot treba dozvolu pristupacnosti za prikaz pritisaka tipki tijekom snimanja. Odobrite pristup u System Settings, zatim pokusajte ponovo.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Prikazi pritiske tipki";
+"Shortcuts Only" = "Samo precaci";
+"All Keystrokes" = "Svi pritisci tipki";
+
+/* Recording — Settings Popover */
+"Delay:" = "Odgoda:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Kopirano u meduspremnik!";

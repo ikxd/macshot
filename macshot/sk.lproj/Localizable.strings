@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Kliknite na \"Record\" a stlacte kombinaciu klaves s aspon jednym modifikatorom (⌘, ⌥, ⌃, ⇧) pre nastavenie skratky.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Spracovanie GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Vyzaduje sa monitorovanie vstupu";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot potrebuje povolenie na monitorovanie vstupu pre zobrazenie stlaceni klaves pocas nahravania. Udelite pristup v System Settings a skuste to znova.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot potrebuje povolenie pristupnosti pre zobrazenie stlaceni klaves pocas nahravania. Udelite pristup v System Settings a skuste to znova.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Zobrazit stlacenia klaves";
+"Shortcuts Only" = "Len skratky";
+"All Keystrokes" = "Vsetky stlacenia klaves";
+
+/* Recording — Settings Popover */
+"Delay:" = "Oneskorenie:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Skopirovane do schranky!";

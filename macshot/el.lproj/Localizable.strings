@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Κάντε κλικ στο \"Record\" και πατήστε έναν συνδυασμό πλήκτρων με τουλάχιστον ένα τροποποιητικό (⌘, ⌥, ⌃, ⇧) για να ορίσετε συντόμευση.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Επεξεργασία GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Απαιτείται παρακολούθηση εισόδου";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "Το macshot χρειάζεται άδεια παρακολούθησης εισόδου για να εμφανίζει τα πλήκτρα κατά την εγγραφή. Παραχωρήστε πρόσβαση στις System Settings και δοκιμάστε ξανά.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "Το macshot χρειάζεται άδεια προσβασιμότητας για να εμφανίζει τα πλήκτρα κατά την εγγραφή. Παραχωρήστε πρόσβαση στις System Settings και δοκιμάστε ξανά.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Εμφάνιση πλήκτρων";
+"Shortcuts Only" = "Μόνο συντομεύσεις";
+"All Keystrokes" = "Όλα τα πλήκτρα";
+
+/* Recording — Settings Popover */
+"Delay:" = "Καθυστέρηση:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Αντιγράφηκε στο πρόχειρο!";

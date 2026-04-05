@@ -400,3 +400,22 @@
 
 /* Preferences - Shortcuts note */
 "Click \"Record\" and press a key combination with at least one modifier (⌘, ⌥, ⌃, ⇧) to set a shortcut." = "Apasa \"Inregistreaza\" si apasa o combinatie de taste cu cel putin un modificator (⌘, ⌥, ⌃, ⇧) pentru a seta o scurtatura.";
+
+/* Recording — GIF Processing */
+"Processing GIF…" = "Se proceseaza GIF…";
+
+/* Recording — Input Monitoring Permission */
+"Input Monitoring Required" = "Monitorizarea tastaturii este necesara";
+"macshot needs Input Monitoring permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot are nevoie de permisiunea Monitorizare intrare pentru a afisa apasarile de taste in timpul inregistrarii. Acorda acces din System Settings, apoi incearca din nou.";
+"macshot needs Accessibility permission to show keystrokes during recording. Please grant access in System Settings, then try again." = "macshot are nevoie de permisiunea de accesibilitate pentru a afisa apasarile de taste in timpul inregistrarii. Acorda acces din System Settings, apoi incearca din nou.";
+
+/* Recording — Keystroke Overlay */
+"Show Keystrokes" = "Afiseaza apasarile de taste";
+"Shortcuts Only" = "Doar scurtaturi";
+"All Keystrokes" = "Toate apasarile de taste";
+
+/* Recording — Settings Popover */
+"Delay:" = "Intarziere:";
+
+/* Video Editor */
+"Copied to clipboard!" = "Copiat in clipboard!";
