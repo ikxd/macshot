@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.8.0-beta.7] - 2026-04-06
+
+### Fixed
+- **Apple Translation crash on rapid toggle** — concurrent translation sessions caused an assertion failure inside Apple's Translation framework. New translations now cancel any in-flight request first, and stale sessions are ignored.
+- **Translate button stays toggled after undo** — Cmd+Z now correctly untoggles the translate button when undoing translation overlays.
+
 ## [3.8.0-beta.6] - 2026-04-06
 
 ### Added

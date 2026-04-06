@@ -300,11 +300,20 @@ final class TranslationBridge: ObservableObject {
     private var pendingTexts: [String] = []
     private var pendingCompletion: ((Result<[String], Error>) -> Void)?
 
+    private var translationID: UUID?
+
     func translate(
         texts: [String],
         configuration: TranslationSession.Configuration,
         completion: @escaping (Result<[String], Error>) -> Void
     ) {
+        // Cancel any in-flight translation before starting a new one
+        if pendingCompletion != nil {
+            cleanup()
+        }
+
+        let thisID = UUID()
+        translationID = thisID
         pendingTexts = texts
         pendingCompletion = completion
 
@@ -322,7 +331,7 @@ final class TranslationBridge: ObservableObject {
 
         // Timeout: if session doesn't respond in 10s, report error
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
-            guard let self = self, self.pendingCompletion != nil else { return }
+            guard let self = self, self.translationID == thisID, self.pendingCompletion != nil else { return }
             let completion = self.pendingCompletion
             self.cleanup()
             completion?(.failure(TranslationError.appleTranslation("Apple Translation timed out. The language pack may need to be downloaded in System Settings.")))
@@ -330,12 +339,18 @@ final class TranslationBridge: ObservableObject {
     }
 
     fileprivate func sessionReady(_ session: TranslationSession) {
+        // Ignore stale sessions from cancelled translations
+        guard pendingCompletion != nil else { return }
         let texts = pendingTexts
         let completion = pendingCompletion
+        let activeID = translationID
         Task {
             do {
                 var results = Array(repeating: "", count: texts.count)
                 for (i, text) in texts.enumerated() {
+                    // Bail if a new translation was started while we're iterating
+                    let stillActive = await MainActor.run { self.translationID == activeID }
+                    guard stillActive else { return }
                     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else {
                         results[i] = text
@@ -345,11 +360,13 @@ final class TranslationBridge: ObservableObject {
                     results[i] = response.targetText
                 }
                 await MainActor.run {
+                    guard self.translationID == activeID else { return }
                     self.cleanup()
                     completion?(.success(results))
                 }
             } catch {
                 await MainActor.run {
+                    guard self.translationID == activeID else { return }
                     self.cleanup()
                     let desc = error.localizedDescription
                     let msg = "Apple Translation failed: \(desc). You can switch to Google Translate in Preferences."
