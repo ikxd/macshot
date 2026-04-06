@@ -16,6 +16,7 @@ enum PopoverHelper {
         popover.behavior = .semitransient
         popover.contentSize = size
         popover.animates = true
+        popover.appearance = NSAppearance(named: .darkAqua)
 
         let vc = NSViewController()
         vc.view = cursorWrapped(contentView)
@@ -46,6 +47,7 @@ enum PopoverHelper {
         popover.behavior = .semitransient
         popover.contentSize = size
         popover.animates = true
+        popover.appearance = NSAppearance(named: .darkAqua)
 
         let vc = NSViewController()
         vc.view = cursorWrapped(contentView)
@@ -74,6 +76,7 @@ enum PopoverHelper {
         popover.behavior = .semitransient
         popover.contentSize = size
         popover.animates = true
+        popover.appearance = NSAppearance(named: .darkAqua)
 
         let vc = NSViewController()
         vc.view = cursorWrapped(contentView)
@@ -107,8 +110,10 @@ enum PopoverHelper {
     }
 
     /// Wrap content view so the popover always shows an arrow cursor regardless of active tool.
+    /// Forces dark appearance since all toolbar popovers use a dark theme.
     private static func cursorWrapped(_ contentView: NSView) -> NSView {
         let wrapper = ArrowCursorView(frame: contentView.frame)
+        wrapper.appearance = NSAppearance(named: .darkAqua)
         wrapper.addSubview(contentView)
         contentView.frame.origin = .zero
         return wrapper

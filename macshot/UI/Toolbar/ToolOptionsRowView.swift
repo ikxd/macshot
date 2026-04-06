@@ -48,6 +48,9 @@ class ToolOptionsRowView: NSView {
         wantsLayer = true
         layer?.cornerRadius = 6
         layer?.backgroundColor = ToolbarLayout.bgColor.cgColor
+        // Force dark appearance so system controls (NSSegmentedControl labels,
+        // NSTextField, NSButton titles) use light text on the dark toolbar background.
+        appearance = NSAppearance(named: .darkAqua)
     }
 
     required init?(coder: NSCoder) { fatalError() }
