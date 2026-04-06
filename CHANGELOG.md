@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.8.0-beta.6] - 2026-04-06
+
+### Added
+- **"Do nothing" Quick Capture mode** — new option in the Enter/Quick Capture dropdown. Capture is taken and the floating thumbnail appears, but nothing is copied or saved. Decide later via thumbnail buttons (copy, save, edit, pin, upload).
+- **Keyboard shortcuts in menu bar** — menu items now display their configured hotkey (e.g. ⇧⌘X) inline, matching standard macOS behavior. Updates live when changed in Preferences.
+- **Shift+Click instant selection in pencil/marker tools** — hold Shift to immediately select annotations without the 300ms long-press delay. Supports multi-selection toggle, same as shape tools. Without Shift, the long-press behavior is preserved.
+- **Async clipboard & history** — PNG encoding for clipboard moved to background thread. Screenshot history thumbnails and index saving run off main thread.
+- **SF Symbol icon cache** — toolbar icons are cached across rebuilds, eliminating re-rasterization on every capture cycle.
+- **Unlimited history option** — new checkbox in Preferences to disable history size limit.
+- **Thumbnail scale slider** — configurable floating thumbnail size in Preferences (default 240×160).
+
+### Changed
+- **Translate language picker** — non-installed languages are now filtered out entirely instead of shown dimmed. Cleaner list when using Apple Translation.
+- **Narrow selection layout** — right toolbar moves below the selection instead of overlapping when the selection is too narrow.
+
+### Fixed
+- **Thumbnail captured in screenshots** — floating thumbnails are now excluded via ScreenCaptureKit's `excludingWindows` filter, eliminating race conditions during rapid captures.
+- **Recording pause/resume gap** — paused time is now subtracted from frame and audio timestamps, producing gap-free video with synced audio instead of black frames.
+- **Light mode toolbar readability** — toolbar options row and all popovers now force dark appearance, fixing unreadable text (segment controls, labels, buttons, list pickers) when the system is in light mode.
+- **Apple Translation "not installed" for English** — language availability check no longer fails on same-language pairs (e.g. en→en). Each language is checked against all others; results are cached for instant popover reopening.
+- **Shift+Click deselect while dragging** — shift-clicking an already-selected annotation now defers deselect to mouseUp, so multi-selection drag works correctly across all tools.
+
 ## [3.8.0-beta.5] - 2026-04-06
 
 ### Added
