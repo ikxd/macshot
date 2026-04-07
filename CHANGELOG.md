@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.0.0-beta.04] - 2026-04-07
+
+### Added
+- **Auto-save to history on every editor output** — Copy, Save, Pin, Upload, and Share from the editor now automatically persist the current image and annotations to screenshot history. A history entry is created on first output if none exists.
+- **Unsaved changes warning on editor close** — closing the editor with unsaved changes shows a "Save & Close / Discard / Cancel" dialog. Warns for captures that were never saved (the image would be lost), and for history entries with annotation changes since last save.
+
+### Fixed
+- **Refined pencil stroke endpoint** — strokes now end exactly where the user released the mouse instead of stopping short due to the smoothing algorithm pulling the endpoint inward.
+
 ## [4.0.0-beta.03] - 2026-04-07
 
 ### Added
