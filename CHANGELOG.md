@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.8.0-beta.8] - 2026-04-07
+
+### Added
+- **Editable annotation history** — screenshots with annotations now save the raw image and annotation data alongside the composited image. Editing from the thumbnail or history panel reopens with live, editable annotations instead of a flattened image.
+- **"Done" button in editor** — when editing a history entry, a Done button appears in the top bar. Clicking it commits the current annotations back to the same history entry in-place. Closing without Done discards changes.
+
+### Changed
+- **Editor scroll view layout** — scroll view is now properly inset from the top bar, fixing the scrollbar hiding behind it. Window sizing accounts for all toolbar chrome so images open without overlap.
+- **Editor centering with insets** — the CenteringClipView now accounts for content insets when centering the document, fixing the inability to scroll past the bottom toolbar at 100% zoom.
+
+### Fixed
+- **Enter key in editor ignoring Quick Capture mode** — pressing Enter in the editor always saved to file regardless of the "Enter / Quick Capture" preference. Now correctly respects Save / Copy / Save+Copy / Do nothing modes, matching overlay behavior.
+
 ## [3.8.0-beta.7] - 2026-04-06
 
 ### Fixed
