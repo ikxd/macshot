@@ -22,7 +22,7 @@
 ### Why macshot?
 
 - **Capture & annotate in one flow** — select a region, draw arrows/text/shapes/blur, copy to clipboard. One hotkey, zero friction.
-- **Screen recording with built-in editor** — record any area or full screen as MP4/GIF with optional system audio, then trim and export without leaving the app.
+- **Screen recording with built-in editor** — record any area or full screen as MP4/GIF with system audio + microphone. Audio merge dialog with per-track volume control. Trim and export without leaving the app.
 - **Scroll capture** — select a region and scroll. macshot stitches it into one seamless tall (or wide) image automatically.
 - **Upload anywhere** — one-click upload to Google Drive, imgbb, or any S3-compatible service (Cloudflare R2, AWS S3, MinIO, etc.). Link copied to clipboard instantly.
 - **Lightweight & native** — ~8 MB memory at idle. Lives in your menu bar. Built with Swift and AppKit, not a web browser in disguise.
@@ -117,7 +117,7 @@ brew install sw33tlie/macshot/macshot
 - **Background removal** — Apple Vision foreground mask (macOS 14+)
 - **Pin to screen** — floating always-on-top window
 - **Floating thumbnail** — auto-dismiss preview with Copy/Save/Pin/Edit/Upload
-- **Screenshot history** — menu bar submenu + drop-down history panel (`Cmd+Shift+H`) with drag-and-drop, Quick Look, and right-click actions
+- **Screenshot history with editable annotations** — menu bar submenu + drop-down history panel (`Cmd+Shift+H`). Re-open any capture in the editor with live annotations preserved — edit, then press Done to save back. Drag-and-drop, Quick Look, and right-click actions
 - **QR & barcode detection** — inline Open/Copy actions
 - **Snap alignment guides** — annotations snap to midlines and edges
 - **Auto-updates** via Sparkle
