@@ -585,6 +585,25 @@ class ToolOptionsRowView: NSView {
     }
 
     private static func gradientSwatchImage(styleIndex: Int, size: CGFloat) -> NSImage {
+        // Custom image background swatch
+        if styleIndex == -1 {
+            if let data = UserDefaults.standard.data(forKey: "beautifyCustomBgImageData"),
+               let img = NSImage(data: data) {
+                return NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
+                    let r = NSRect(x: 0, y: 0, width: size, height: size)
+                    let path = NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4)
+                    NSGraphicsContext.saveGraphicsState()
+                    path.addClip()
+                    img.draw(in: r, from: .zero, operation: .sourceOver, fraction: 1.0)
+                    NSGraphicsContext.restoreGraphicsState()
+                    ToolbarLayout.iconColor.withAlphaComponent(0.3).setStroke()
+                    path.lineWidth = 0.5
+                    path.stroke()
+                    return true
+                }
+            }
+            return NSImage(size: NSSize(width: size, height: size))
+        }
         let styles = BeautifyRenderer.styles
         guard styleIndex >= 0, styleIndex < styles.count else {
             return NSImage(size: NSSize(width: size, height: size))
@@ -1055,6 +1074,11 @@ class ToolOptionsRowView: NSView {
         // Shadow slider
         curX = addBeautifySlider(at: curX, label: L("Shadow"), value: ov.beautifyShadowRadius, min: 0, max: 100, action: #selector(beautifyShadowChanged(_:)))
 
+        // Blur slider — only shown for custom image backgrounds
+        if ov.beautifyStyleIndex == -1 {
+            curX = addBeautifySlider(at: curX, label: L("Blur"), value: ov.beautifyBackgroundBlur, min: 0, max: 50, action: #selector(beautifyBlurChanged(_:)))
+        }
+
         curX = addSeparator(at: curX)
 
         // Gradient style picker — swatch preview + dropdown arrow
@@ -1150,6 +1174,14 @@ class ToolOptionsRowView: NSView {
         guard let ov = overlayView else { return }
         ov.beautifyShadowRadius = CGFloat(sender.floatValue)
         UserDefaults.standard.set(sender.doubleValue, forKey: "beautifyShadowRadius")
+        ov.needsDisplay = true
+    }
+
+    @objc private func beautifyBlurChanged(_ sender: NSSlider) {
+        guard let ov = overlayView else { return }
+        ov.beautifyBackgroundBlur = CGFloat(sender.floatValue)
+        UserDefaults.standard.set(sender.doubleValue, forKey: "beautifyBgBlur")
+        ov.cachedCompositedImage = nil
         ov.needsDisplay = true
     }
 

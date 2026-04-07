@@ -1,4 +1,5 @@
 import Cocoa
+import UniformTypeIdentifiers
 
 extension OverlayView {
 
@@ -152,12 +153,23 @@ extension OverlayView {
     func showBeautifyGradientPopover(anchorView: NSView? = nil, anchorRect: NSRect = .zero) {
         let picker = GradientPickerView(selectedIndex: beautifyStyleIndex)
         picker.onSelect = { [weak self] idx in
-            self?.beautifyStyleIndex = idx
+            guard let self = self else { return }
+            self.beautifyStyleIndex = idx
             UserDefaults.standard.set(idx, forKey: "beautifyStyleIndex")
-            self?.cachedCompositedImage = nil
-            self?.needsDisplay = true
-            // Update the swatch preview button in the options row
-            self?.updateBeautifySwatch(styleIndex: idx)
+            if idx >= 0 {
+                // Gradient selected — clear custom background
+                self.customBeautifyBackground = nil
+            } else {
+                // Custom image selected — load from storage
+                self.loadCustomBeautifyBackground()
+            }
+            self.cachedCompositedImage = nil
+            self.needsDisplay = true
+            self.updateBeautifySwatch(styleIndex: idx)
+        }
+        picker.onCustomImage = { [weak self] in
+            PopoverHelper.dismiss()
+            self?.pickCustomBeautifyBackground()
         }
         if let anchor = anchorView {
             PopoverHelper.show(
@@ -169,6 +181,40 @@ extension OverlayView {
                 at: NSPoint(x: anchorRect.midX, y: anchorRect.midY),
                 in: self, preferredEdge: .minY)
         }
+    }
+
+    func pickCustomBeautifyBackground() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        // Lower overlay window level temporarily so the open panel is interactive
+        let savedLevel = window?.level
+        window?.level = .normal
+        panel.beginSheetModal(for: window!) { [weak self] response in
+            self?.window?.level = savedLevel ?? .normal
+            guard let self = self, response == .OK, let url = panel.url,
+                  let image = NSImage(contentsOf: url) else { return }
+            // Store image data (PNG) in UserDefaults for persistence
+            if let tiff = image.tiffRepresentation,
+               let bitmap = NSBitmapImageRep(data: tiff),
+               let pngData = bitmap.representation(using: .png, properties: [:]) {
+                UserDefaults.standard.set(pngData, forKey: "beautifyCustomBgImageData")
+            }
+            self.customBeautifyBackground = image
+            self.beautifyStyleIndex = -1
+            UserDefaults.standard.set(-1, forKey: "beautifyStyleIndex")
+            self.cachedCompositedImage = nil
+            self.needsDisplay = true
+            self.updateBeautifySwatch(styleIndex: -1)
+        }
+    }
+
+    func loadCustomBeautifyBackground() {
+        guard let data = UserDefaults.standard.data(forKey: "beautifyCustomBgImageData"),
+              let image = NSImage(data: data) else { return }
+        customBeautifyBackground = image
     }
 
     func showEmojiPopover(anchorView: NSView? = nil, anchorRect: NSRect = .zero) {

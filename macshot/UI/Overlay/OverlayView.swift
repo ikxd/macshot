@@ -325,15 +325,25 @@ class OverlayView: NSView {
         return v != nil ? CGFloat(v!) : 8
     }()
 
+    var customBeautifyBackground: NSImage?
+    var beautifyBackgroundBlur: CGFloat = UserDefaults.standard.object(forKey: "beautifyBgBlur") as? CGFloat ?? 0
+
     var beautifyConfig: BeautifyConfig {
-        BeautifyConfig(
+        // Lazy-load custom background from UserDefaults if needed
+        if beautifyStyleIndex == -1 && customBeautifyBackground == nil {
+            if let data = UserDefaults.standard.data(forKey: "beautifyCustomBgImageData"),
+               let img = NSImage(data: data) { customBeautifyBackground = img }
+        }
+        return BeautifyConfig(
             mode: beautifyMode,
             styleIndex: beautifyStyleIndex,
             padding: beautifyPadding,
             cornerRadius: beautifyCornerRadius,
             shadowRadius: beautifyShadowRadius,
             bgRadius: 0,
-            isWindowSnap: selectionIsWindowSnap
+            isWindowSnap: selectionIsWindowSnap,
+            customBackgroundImage: beautifyStyleIndex == -1 ? customBeautifyBackground : nil,
+            backgroundBlur: beautifyBackgroundBlur
         )
     }
 

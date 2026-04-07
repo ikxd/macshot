@@ -53,6 +53,11 @@ struct BeautifyConfig {
     var shadowRadius: CGFloat = 20  // 0..100
     var bgRadius: CGFloat = 8      // 0..30 (outer background corner radius)
     var isWindowSnap: Bool = false  // true = selection came from window snap, skip synthetic title bar
+    var customBackgroundImage: NSImage?  // custom image background (nil = use gradient)
+    var backgroundBlur: CGFloat = 0     // 0..50 blur radius for custom background
+
+    /// Whether a custom background image is active
+    var isCustomBackground: Bool { customBackgroundImage != nil }
 
     /// Convenience: the resolved style from styles array
     var style: BeautifyStyle {
@@ -442,6 +447,17 @@ struct BeautifyConfig {
             ], angle: 150),
         ])
 
+        // Extra non-mesh gradients
+        let c = { (r: CGFloat, g: CGFloat, b: CGFloat) in NSColor(calibratedRed: r, green: g, blue: b, alpha: 1) }
+        s.append(contentsOf: [
+            BeautifyStyle(name: "Emerald", stops: [(c(0.0, 0.6, 0.4), 0), (c(0.1, 0.85, 0.6), 0.5), (c(0.0, 0.5, 0.3), 1)], angle: 135),
+            BeautifyStyle(name: "Cherry", stops: [(c(0.7, 0.1, 0.2), 0), (c(0.9, 0.2, 0.3), 0.5), (c(0.55, 0.05, 0.15), 1)], angle: 150),
+            BeautifyStyle(name: "Sapphire", stops: [(c(0.1, 0.15, 0.5), 0), (c(0.2, 0.3, 0.75), 0.5), (c(0.05, 0.1, 0.4), 1)], angle: 120),
+            BeautifyStyle(name: "Sand", stops: [(c(0.85, 0.75, 0.55), 0), (c(0.95, 0.88, 0.7), 0.5), (c(0.75, 0.65, 0.45), 1)], angle: 135),
+            BeautifyStyle(name: "Pure White", stops: [(c(0.95, 0.95, 0.95), 0), (c(1.0, 1.0, 1.0), 0.5), (c(0.92, 0.92, 0.92), 1)], angle: 180),
+            BeautifyStyle(name: "Pure Black", stops: [(c(0.05, 0.05, 0.05), 0), (c(0.12, 0.12, 0.12), 0.5), (c(0.0, 0.0, 0.0), 1)], angle: 180),
+        ])
+
         return s
     }()
 
@@ -467,8 +483,42 @@ struct BeautifyConfig {
         }
     }
 
-    /// Draw just the background gradient into a rect (for live overlay preview)
+    /// Draw just the background gradient (or custom image) into a rect (for live overlay preview)
     static func drawGradientBackground(in rect: NSRect, config: BeautifyConfig, context: CGContext) {
+        // Custom image background
+        if let bgImage = config.customBackgroundImage {
+            var imageToDraw = bgImage
+            // Apply blur if configured
+            if config.backgroundBlur > 0, let cgImg = bgImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                let ciImage = CIImage(cgImage: cgImg)
+                if let filter = CIFilter(name: "CIGaussianBlur") {
+                    filter.setValue(ciImage, forKey: kCIInputImageKey)
+                    filter.setValue(config.backgroundBlur, forKey: kCIInputRadiusKey)
+                    let ciCtx = CIContext()
+                    if let output = filter.outputImage,
+                       let blurredCG = ciCtx.createCGImage(output, from: ciImage.extent) {
+                        imageToDraw = NSImage(cgImage: blurredCG, size: bgImage.size)
+                    }
+                }
+            }
+            // Draw image scaled to fill the rect (aspect fill + center crop)
+            let imgSize = imageToDraw.size
+            let scaleX = rect.width / imgSize.width
+            let scaleY = rect.height / imgSize.height
+            let fillScale = max(scaleX, scaleY)
+            let drawW = imgSize.width * fillScale
+            let drawH = imgSize.height * fillScale
+            let drawRect = NSRect(
+                x: rect.minX + (rect.width - drawW) / 2,
+                y: rect.minY + (rect.height - drawH) / 2,
+                width: drawW, height: drawH)
+            context.saveGState()
+            context.clip(to: rect)
+            imageToDraw.draw(in: drawRect, from: .zero, operation: .copy, fraction: 1.0)
+            context.restoreGState()
+            return
+        }
+
         let style = config.style
 
         // Mesh gradient path (macOS 15+)
