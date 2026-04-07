@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.0.0-beta.02] - 2026-04-07
+
+### Added
+- **Lasso marquee selection** — hold Shift and drag on empty space from any tool to draw a selection rectangle. All annotations intersecting the marquee are selected on release. Blue dashed border with translucent fill while dragging.
+- **"Open from Clipboard" hotkey** — new configurable global hotkey in Preferences > Shortcuts (default: None). Opens the clipboard image in the editor from anywhere.
+
+### Changed
+- **Select tool removed from shortcuts** — annotation selection is now handled entirely via click-to-select, Shift+click multi-select, and Shift+drag lasso from any tool. No dedicated tool needed.
+
+### Fixed
+- **Blurry screenshots on mixed-DPI setups** — replaced `tiffRepresentation` with direct CGImage extraction in the image encoder. Preserves exact pixel data regardless of which display the app runs on. Fixes quality loss when Retina and non-Retina monitors are mixed.
+- **Purple selection border in recordings** — the selection border overlay now draws entirely outside the capture rect, and macshot's UI chrome windows (border + HUD) are excluded from SCStream capture.
+
 ## [4.0.0-beta.01] - 2026-04-07
 
 ### Added
