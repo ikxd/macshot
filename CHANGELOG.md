@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.0.0-beta.01] - 2026-04-07
+
+### Added
+- **Hide recording controls** — new option in Preferences > Recording and the gear menu to hide the floating HUD and selection border during recording. Stop via menu bar icon.
+
+### Changed
+- **Shortcut preferences UI** — unified all buttons to "Set", added reset-to-default (↺) button on every shortcut row for both global hotkeys and overlay/editor tool shortcuts.
+
+### Fixed
+- **Shortcut "Set" button stuck on "Press..."** — button title now resets after recording completes or is cancelled.
+- **Toolbar text labels off-center** — font name, "Fill", and "Outline" labels in the options row were 1-2px low due to AppKit's recessed button padding. Fixed with baseline offset.
+
 ## [3.8.0-beta.10] - 2026-04-07
 
 ### Fixed
