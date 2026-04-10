@@ -1332,18 +1332,7 @@ class ToolOptionsRowView: NSView {
         ov.needsDisplay = true
     }
 
-    @objc private func fontSizeChanged(_ sender: NSStepper) {
-        guard let ov = overlayView else { return }
-        ov.textEditor.fontSize = CGFloat(sender.integerValue)
-        UserDefaults.standard.set(sender.doubleValue, forKey: "fontSize")
-        if let label = viewWithTag(998) as? NSTextField {
-            label.stringValue = "\(sender.integerValue)pt"
-            label.sizeToFit()
-        }
-        ov.textEditor.applyFontSizeChange()
-        ov.applyTextFormattingToSelectedAnnotations()
-        ov.needsDisplay = true
-    }
+
 
     @objc private func boldToggled() { overlayView?.textEditor.toggleBold(); overlayView.map { $0.applyTextFormattingToSelectedAnnotations(); $0.needsDisplay = true; rebuild(for: $0.currentTool) } }
     @objc private func italicToggled() { overlayView?.textEditor.toggleItalic(); overlayView.map { $0.applyTextFormattingToSelectedAnnotations(); $0.needsDisplay = true; rebuild(for: $0.currentTool) } }

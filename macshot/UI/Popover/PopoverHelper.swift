@@ -34,35 +34,6 @@ enum PopoverHelper {
     }
 
     /// Show a popover anchored to a specific point in a view (for overlay mode where buttons aren't real views).
-    /// Show a popover anchored to a rect in a parent view. The anchor view spans the full rect
-    /// so the popover arrow clears it whether opening above or below.
-    static func showAtRect(_ contentView: NSView, size: NSSize, rect: NSRect, in parentView: NSView, preferredEdge: NSRectEdge = .minY) {
-        dismiss()
-
-        let anchor = NSView(frame: rect)
-        parentView.addSubview(anchor)
-        anchorView = anchor
-
-        let popover = NSPopover()
-        popover.behavior = .semitransient
-        popover.contentSize = size
-        popover.animates = true
-        popover.appearance = NSAppearance(named: .darkAqua)
-
-        let vc = NSViewController()
-        vc.view = cursorWrapped(contentView)
-        popover.contentViewController = vc
-        popover.delegate = AnchorCleanupDelegate.shared
-        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: preferredEdge)
-
-        if let popoverWindow = popover.contentViewController?.view.window {
-            let parentLevel = parentView.window?.level ?? .normal
-            if parentLevel.rawValue > NSWindow.Level.normal.rawValue {
-                popoverWindow.level = NSWindow.Level(parentLevel.rawValue + 1)
-            }
-        }
-        activePopover = popover
-    }
 
     static func showAtPoint(_ contentView: NSView, size: NSSize, at point: NSPoint, in parentView: NSView, preferredEdge: NSRectEdge = .minY) {
         dismiss()
