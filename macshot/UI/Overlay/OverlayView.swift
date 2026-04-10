@@ -474,7 +474,14 @@ class OverlayView: NSView {
         UserDefaults.standard.object(forKey: "snapGuidesEnabled") as? Bool ?? true
     }
 
-    var cachedCompositedImage: NSImage? = nil  // invalidated when annotations change
+    var cachedCompositedImage: NSImage? = nil {  // invalidated when annotations change
+        didSet { if !isDraggingAnnotation && !isResizingAnnotation && !isRotatingAnnotation { cachedAnnotationLayer = nil } }
+    }
+    /// Cached transparent image of committed annotations only (no screenshot).
+    /// Drawn with applyCanvasTransform so zoom works correctly. Invalidated alongside cachedCompositedImage.
+    private var cachedAnnotationLayer: NSImage? = nil
+    /// During drag/resize, this holds a cache of all annotations EXCEPT the ones being manipulated.
+    private var cachedAnnotationLayerExcludingSelected: NSImage? = nil
     private var cachedOpaqueRect: NSRect?  // cached opaque content bounds of screenshotImage
 
     var isTranslating: Bool = false
@@ -1403,25 +1410,45 @@ class OverlayView: NSView {
             let editorDrawnFromCache = (self as? EditorView)?.drewFromCompositeCache ?? false
 
             if !editorDrawnFromCache {
-                // Draw translate overlays clipped to selection (they must stay inside).
-                context.saveGraphicsState()
-                applyCanvasTransform(to: context)
-                NSBezierPath(rect: selectionRect).setClip()
-                for annotation in annotations where annotation.tool == .translateOverlay {
-                    annotation.draw(in: context)
-                }
-                context.restoreGraphicsState()
+                // Fast path: when not actively drawing, use a cached transparent image
+                // of all committed annotations instead of iterating them each frame.
+                if !isActivelyDrawing && !annotations.isEmpty && !isEditorMode {
+                    if (isDraggingAnnotation || isResizingAnnotation || isRotatingAnnotation),
+                       let staticLayer = cachedAnnotationLayerExcludingSelected {
+                        // During drag/resize: draw cached static annotations + selected ones live
+                        context.saveGraphicsState()
+                        applyCanvasTransform(to: context)
+                        staticLayer.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1.0)
+                        for annotation in selectedAnnotations {
+                            annotation.draw(in: context)
+                        }
+                    } else {
+                        let layer = annotationLayerImage()
+                        context.saveGraphicsState()
+                        applyCanvasTransform(to: context)
+                        layer.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1.0)
+                    }
+                } else {
+                    // Draw translate overlays clipped to selection (they must stay inside).
+                    context.saveGraphicsState()
+                    applyCanvasTransform(to: context)
+                    NSBezierPath(rect: selectionRect).setClip()
+                    for annotation in annotations where annotation.tool == .translateOverlay {
+                        annotation.draw(in: context)
+                    }
+                    context.restoreGraphicsState()
 
-                // Draw user annotations unclipped — strokes can continue past the selection border.
-                // Censor annotations (pixelate/blur) render first so other annotations
-                // always appear on top of blurred regions.
-                context.saveGraphicsState()
-                applyCanvasTransform(to: context)
-                for annotation in annotations where annotation.tool != .translateOverlay && annotation.tool == .pixelate {
-                    annotation.draw(in: context)
-                }
-                for annotation in annotations where annotation.tool != .translateOverlay && annotation.tool != .pixelate {
-                    annotation.draw(in: context)
+                    // Draw user annotations unclipped — strokes can continue past the selection border.
+                    // Censor annotations (pixelate/blur) render first so other annotations
+                    // always appear on top of blurred regions.
+                    context.saveGraphicsState()
+                    applyCanvasTransform(to: context)
+                    for annotation in annotations where annotation.tool != .translateOverlay && annotation.tool == .pixelate {
+                        annotation.draw(in: context)
+                    }
+                    for annotation in annotations where annotation.tool != .translateOverlay && annotation.tool != .pixelate {
+                        annotation.draw(in: context)
+                    }
                 }
             } else {
                 // Still need the canvas transform for active drawing and overlays below
@@ -3770,7 +3797,7 @@ class OverlayView: NSView {
 
         // Compute actual bounding box — for pencil/marker, use the points array
         // since boundingRect only considers startPoint/endPoint.
-        let baseBBox: NSRect
+        var baseBBox: NSRect
         if let pts = annotation.points, !pts.isEmpty,
            (annotation.tool == .pencil || annotation.tool == .marker) {
             var minX = CGFloat.greatestFiniteMagnitude, minY = CGFloat.greatestFiniteMagnitude
@@ -3783,11 +3810,20 @@ class OverlayView: NSView {
         } else {
             baseBBox = annotation.boundingRect
         }
+        // Expand to rotated bounding box so the glow covers the full rotated shape
+        if annotation.rotation != 0 && annotation.supportsRotation {
+            let cx = baseBBox.midX, cy = baseBBox.midY
+            let cos_r = abs(cos(annotation.rotation)), sin_r = abs(sin(annotation.rotation))
+            let w = baseBBox.width, h = baseBBox.height
+            let rotW = w * cos_r + h * sin_r
+            let rotH = w * sin_r + h * cos_r
+            baseBBox = NSRect(x: cx - rotW / 2, y: cy - rotH / 2, width: rotW, height: rotH)
+        }
         let bbox = baseBBox.insetBy(dx: -padding, dy: -padding)
         guard bbox.width > 0, bbox.height > 0 else { return }
 
-        // Use cached glow if available and position hasn't changed
-        if let cached = annotation.outlineGlowImage, annotation.outlineGlowRect == bbox {
+        // Use cached glow if available and position/rotation hasn't changed
+        if let cached = annotation.outlineGlowImage, annotation.outlineGlowRect == bbox, annotation.outlineGlowRotation == annotation.rotation {
             guard let context = NSGraphicsContext.current else { return }
             context.cgContext.saveGState()
             context.cgContext.setAlpha(0.55)
@@ -3836,6 +3872,7 @@ class OverlayView: NSView {
         let outlineImage = NSImage(cgImage: outlineCG, size: bbox.size)
         annotation.outlineGlowImage = outlineImage
         annotation.outlineGlowRect = bbox
+        annotation.outlineGlowRotation = annotation.rotation
 
         guard let context = NSGraphicsContext.current else { return }
         context.cgContext.saveGState()
@@ -5080,12 +5117,16 @@ class OverlayView: NSView {
         }
         if isRotatingAnnotation {
             isRotatingAnnotation = false
+            cachedAnnotationLayerExcludingSelected = nil
+            cachedAnnotationLayer = nil
             NSCursor.openHand.set()
             needsDisplay = true
             return
         }
         if isResizingAnnotation {
             isResizingAnnotation = false
+            cachedAnnotationLayerExcludingSelected = nil
+            cachedAnnotationLayer = nil
             annotationResizeHandle = .none
             if let ann = selectedAnnotation {
                 if ann.tool == .loupe { ann.bakeLoupe() }
@@ -5188,6 +5229,8 @@ class OverlayView: NSView {
                 }
                 isDraggingAnnotation = false
                 didMoveAnnotation = false
+                cachedAnnotationLayerExcludingSelected = nil
+                cachedAnnotationLayer = nil
                 snapGuideX = nil
                 snapGuideY = nil
                 NSCursor.openHand.set()
@@ -6191,6 +6234,8 @@ class OverlayView: NSView {
                 isDraggingAnnotation = true
                 didMoveAnnotation = false
                 annotationDragStart = point
+                // Build cache of non-selected annotations for fast drag rendering
+                cachedAnnotationLayerExcludingSelected = buildAnnotationLayer(excluding: Set(selectedAnnotations.map { ObjectIdentifier($0) }))
                 NSCursor.closedHand.set()
                 needsDisplay = true
                 return
@@ -6225,6 +6270,8 @@ class OverlayView: NSView {
                         self.isDraggingAnnotation = true
                         self.didMoveAnnotation = false
                         self.annotationDragStart = point
+                        // Build cache of non-selected annotations for fast drag rendering
+                        self.cachedAnnotationLayerExcludingSelected = self.buildAnnotationLayer(excluding: Set(self.selectedAnnotations.map { ObjectIdentifier($0) }))
                         // Cancel any in-progress pencil stroke
                         self.currentAnnotation = nil
                         NSCursor.closedHand.set()
@@ -6347,6 +6394,8 @@ class OverlayView: NSView {
             let (handle, rect) = handleEntry
             if rect.insetBy(dx: -4, dy: -4).contains(handleTestPoint) {
                 isResizingAnnotation = true
+                // Build cache of non-selected annotations for fast resize rendering
+                cachedAnnotationLayerExcludingSelected = buildAnnotationLayer(excluding: Set(selectedAnnotations.map { ObjectIdentifier($0) }))
                 annotationResizeHandle = handle
                 annotationResizeOrigStart = selected.startPoint
                 annotationResizeOrigEnd = selected.endPoint
@@ -6379,6 +6428,7 @@ class OverlayView: NSView {
             && annotationRotateHandleRect.insetBy(dx: -6, dy: -6).contains(point)
         {
             isRotatingAnnotation = true
+            cachedAnnotationLayerExcludingSelected = buildAnnotationLayer(excluding: Set(selectedAnnotations.map { ObjectIdentifier($0) }))
             let center = NSPoint(x: selected.boundingRect.midX, y: selected.boundingRect.midY)
             rotationStartAngle = atan2(point.x - center.x, point.y - center.y)
             rotationOriginal = selected.rotation
@@ -6431,6 +6481,7 @@ class OverlayView: NSView {
             isDraggingAnnotation = true
             didMoveAnnotation = false
             annotationDragStart = point
+            cachedAnnotationLayerExcludingSelected = buildAnnotationLayer(excluding: Set(selectedAnnotations.map { ObjectIdentifier($0) }))
             NSCursor.closedHand.set()
             needsDisplay = true
             return true
@@ -7100,6 +7151,48 @@ class OverlayView: NSView {
             if !isInsideScrollView { resetZoom() }
         }
         needsDisplay = true
+    }
+
+    // MARK: - Annotation layer cache
+
+    /// Render all committed annotations into a transparent image (canvas-space, no zoom).
+    /// Reused across frames until annotations change, avoiding per-frame iteration.
+    private func annotationLayerImage() -> NSImage {
+        if let cached = cachedAnnotationLayer { return cached }
+        let size = bounds.size
+        let image = NSImage(size: size, flipped: false) { [annotations] _ in
+            guard let context = NSGraphicsContext.current else { return true }
+            // Censor annotations render first so other annotations appear on top
+            for annotation in annotations where annotation.tool == .pixelate {
+                annotation.draw(in: context)
+            }
+            for annotation in annotations where annotation.tool != .pixelate {
+                annotation.draw(in: context)
+            }
+            return true
+        }
+        // Force rasterization so subsequent draws are a fast blit
+        _ = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        cachedAnnotationLayer = image
+        return image
+    }
+
+    /// Build annotation layer excluding specific annotations (used during drag/resize).
+    private func buildAnnotationLayer(excluding: Set<ObjectIdentifier>) -> NSImage {
+        let size = bounds.size
+        let filtered = annotations.filter { !excluding.contains(ObjectIdentifier($0)) }
+        let image = NSImage(size: size, flipped: false) { _ in
+            guard let context = NSGraphicsContext.current else { return true }
+            for annotation in filtered where annotation.tool == .pixelate {
+                annotation.draw(in: context)
+            }
+            for annotation in filtered where annotation.tool != .pixelate {
+                annotation.draw(in: context)
+            }
+            return true
+        }
+        _ = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        return image
     }
 
     // MARK: - Output
