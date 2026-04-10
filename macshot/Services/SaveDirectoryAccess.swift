@@ -60,7 +60,7 @@ enum SaveDirectoryAccess {
         url.stopAccessingSecurityScopedResource()
     }
 
-    /// The display path for the preferences UI.
+    /// The display path for the settings UI.
     static var displayPath: String {
         UserDefaults.standard.string(forKey: pathKey) ?? "~/Pictures"
     }

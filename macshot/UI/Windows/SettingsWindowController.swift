@@ -2,8 +2,8 @@ import Cocoa
 import Carbon
 import ServiceManagement
 
-/// Preferences window that intercepts Cmd+Q to close itself instead of quitting the app.
-private class PreferencesWindow: NSWindow {
+/// Settings window that intercepts Cmd+Q to close itself instead of quitting the app.
+private class SettingsWindow: NSWindow {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "q" {
             close()
@@ -13,7 +13,7 @@ private class PreferencesWindow: NSWindow {
     }
 }
 
-class PreferencesWindowController: NSWindowController, NSTabViewDelegate, NSWindowDelegate {
+class SettingsWindowController: NSWindowController, NSTabViewDelegate, NSWindowDelegate {
 
     private var hotkeyFields: [HotkeyManager.HotkeySlot: NSTextField] = [:]
     private var hotkeyButtons: [HotkeyManager.HotkeySlot: NSButton] = [:]
@@ -86,7 +86,7 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate, NSWind
     var onHotkeyChanged: (() -> Void)?
 
     init() {
-        let window = PreferencesWindow(
+        let window = SettingsWindow(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 660),
             styleMask: [.titled, .closable],
             backing: .buffered,
@@ -98,7 +98,7 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate, NSWind
         super.init(window: window)
         window.delegate = self
         setupUI()
-        loadPreferences()
+        loadSettings()
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1607,9 +1607,9 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate, NSWind
         return box
     }
 
-    // MARK: - Load preferences
+    // MARK: - Load settings
 
-    private func loadPreferences() {
+    private func loadSettings() {
         // Load shortcut fields
         for slot in HotkeyManager.HotkeySlot.allCases {
             hotkeyFields[slot]?.stringValue = HotkeyManager.displayString(for: slot)
@@ -2011,7 +2011,7 @@ class PreferencesWindowController: NSWindowController, NSTabViewDelegate, NSWind
     }
 
     func showWindow() {
-        loadPreferences()
+        loadSettings()
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.setActivationPolicy(.regular)

@@ -270,7 +270,7 @@ final class S3Uploader {
 
         var errorDescription: String? {
             switch self {
-            case .notConfigured: return "S3 not configured — check Preferences"
+            case .notConfigured: return "S3 not configured — check Settings"
             case .invalidEndpoint: return "Invalid S3 endpoint URL"
             case .encodingFailed: return "Failed to encode image"
             case .fileReadFailed: return "Failed to read file"

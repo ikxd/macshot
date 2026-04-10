@@ -11,7 +11,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private var statusItem: NSStatusItem!
     private var updaterController: SPUStandardUpdaterController!
     private var overlayControllers: [OverlayWindowController] = []
-    private var preferencesController: PreferencesWindowController?
+    private var settingsController: SettingsWindowController?
     private var onboardingController: PermissionOnboardingController?
     private var pinControllers: [PinWindowController] = []
     private var thumbnailControllers: [FloatingThumbnailController] = []
@@ -52,7 +52,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.sw33tlie.macshot.macshot"
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
         if running.count > 1 {
-            // Tell the existing instance to show its icon and open Preferences
+            // Tell the existing instance to show its icon and open Settings
             DistributedNotificationCenter.default().postNotificationName(
                 .init("com.sw33tlie.macshot.showAndOpenPrefs"),
                 object: nil, userInfo: nil, deliverImmediately: true
@@ -119,12 +119,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        // Re-launching macshot while it's running: show the menu bar icon and open Preferences
+        // Re-launching macshot while it's running: show the menu bar icon
         if UserDefaults.standard.bool(forKey: "hideMenuBarIcon") {
             UserDefaults.standard.set(false, forKey: "hideMenuBarIcon")
             setMenuBarIconVisible(true)
         }
-        openPreferences()
+        // Only open settings if no windows are visible (e.g. pure menu-bar state).
+        // If editor/video editor is already open, just bring the app to the front.
+        if !flag {
+            openSettings()
+        }
         return false
     }
 
@@ -302,7 +306,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        let prefsItem = NSMenuItem(title: L("Settings..."), action: #selector(openPreferences), keyEquivalent: ",")
+        let prefsItem = NSMenuItem(title: L("Settings..."), action: #selector(openSettings), keyEquivalent: ",")
         prefsItem.target = self
         prefsItem.image = NSImage(systemSymbolName: "gear", accessibilityDescription: nil)
         menu.addItem(prefsItem)
@@ -688,7 +692,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             UserDefaults.standard.set(false, forKey: "hideMenuBarIcon")
             setMenuBarIconVisible(true)
         }
-        openPreferences()
+        openSettings()
     }
 
     @objc private func spaceDidChange() {
@@ -1007,17 +1011,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         }
     }
 
-    // MARK: - Preferences
+    // MARK: - Settings
 
-    @objc private func openPreferences() {
-        if preferencesController == nil {
-            preferencesController = PreferencesWindowController()
-            preferencesController?.onHotkeyChanged = { [weak self] in
+    @objc private func openSettings() {
+        if settingsController == nil {
+            settingsController = SettingsWindowController()
+            settingsController?.onHotkeyChanged = { [weak self] in
                 self?.registerHotkey()
                 self?.rebuildStatusBarMenu()
             }
         }
-        preferencesController?.showWindow()
+        settingsController?.showWindow()
     }
 
     // MARK: - Quit

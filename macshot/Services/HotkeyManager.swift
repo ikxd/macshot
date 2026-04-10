@@ -131,7 +131,7 @@ class HotkeyManager {
         register(slot: .openFromClipboard, callback: openFromClipboard)
     }
 
-    /// Re-register all hotkeys (e.g., after preferences change).
+    /// Re-register all hotkeys (e.g., after settings change).
     func reregisterAll() {
         let savedCallbacks = callbacks
         unregisterAll()

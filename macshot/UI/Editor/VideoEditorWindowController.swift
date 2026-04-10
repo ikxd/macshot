@@ -111,6 +111,13 @@ private final class VideoEditorView: NSView {
     private var thumbnailsGenerating: Bool = false
     private var lastThumbnailWidth: CGFloat = 0
 
+    // Format toggle (MP4 vs GIF export)
+    private var exportAsGIF: Bool = false
+    private var formatToggleRect: NSRect = .zero
+    private var formatMP4Rect: NSRect = .zero
+    private var formatGIFRect: NSRect = .zero
+    private var isConvertingGIF: Bool = false
+
     // Button rects
     private var playBtnRect: NSRect = .zero
     private var saveBtnRect: NSRect = .zero
@@ -382,7 +389,7 @@ private final class VideoEditorView: NSView {
         let trimRect = NSRect(x: startX, y: tlY, width: endX - startX, height: tlH)
         let trimBorder = NSBezierPath(roundedRect: trimRect.insetBy(dx: 0.5, dy: 0.5), xRadius: 2, yRadius: 2)
         trimBorder.lineWidth = 1.5
-        NSColor.systemPurple.withAlphaComponent(0.8).setStroke()
+        ToolbarLayout.accentColor.withAlphaComponent(0.8).setStroke()
         trimBorder.stroke()
         NSGraphicsContext.restoreGraphicsState()
 
@@ -391,12 +398,12 @@ private final class VideoEditorView: NSView {
         let handleH: CGFloat = tlH + 8
 
         let startHandleRect = NSRect(x: startX - handleW / 2, y: tlY - 4, width: handleW, height: handleH)
-        NSColor.systemPurple.setFill()
+        ToolbarLayout.accentColor.setFill()
         NSBezierPath(roundedRect: startHandleRect, xRadius: 3, yRadius: 3).fill()
         drawHandleGrip(in: startHandleRect)
 
         let endHandleRect = NSRect(x: endX - handleW / 2, y: tlY - 4, width: handleW, height: handleH)
-        NSColor.systemPurple.setFill()
+        ToolbarLayout.accentColor.setFill()
         NSBezierPath(roundedRect: endHandleRect, xRadius: 3, yRadius: 3).fill()
         drawHandleGrip(in: endHandleRect)
 
@@ -451,7 +458,46 @@ private final class VideoEditorView: NSView {
         drawIconButton(rect: muteBtnRect, symbol: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", accent: false, active: isMuted)
         x += iconBtnW + gap
 
-        // File info (hidden when window is too narrow)
+        // Format toggle + file info
+        if !isGIF {
+            // MP4 | GIF segmented toggle
+            let segW: CGFloat = 88
+            let segH: CGFloat = 22
+            let segY = btnY + (btnH - segH) / 2
+            formatToggleRect = NSRect(x: x + 4, y: segY, width: segW, height: segH)
+            let halfW = segW / 2
+            formatMP4Rect = NSRect(x: formatToggleRect.minX, y: segY, width: halfW, height: segH)
+            formatGIFRect = NSRect(x: formatToggleRect.minX + halfW, y: segY, width: halfW, height: segH)
+
+            // Background
+            NSColor.white.withAlphaComponent(0.08).setFill()
+            NSBezierPath(roundedRect: formatToggleRect, xRadius: 5, yRadius: 5).fill()
+
+            // Selected segment highlight
+            let selRect = exportAsGIF ? formatGIFRect : formatMP4Rect
+            ToolbarLayout.accentColor.withAlphaComponent(0.6).setFill()
+            NSBezierPath(roundedRect: selRect.insetBy(dx: 1, dy: 1), xRadius: 4, yRadius: 4).fill()
+
+            // Labels
+            let selAttrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+                .foregroundColor: NSColor.white,
+            ]
+            let unselAttrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                .foregroundColor: NSColor.white.withAlphaComponent(0.5),
+            ]
+            let mp4Str = "MP4" as NSString
+            let gifStr = "GIF" as NSString
+            let mp4Size = mp4Str.size(withAttributes: selAttrs)
+            let gifSize = gifStr.size(withAttributes: selAttrs)
+            mp4Str.draw(at: NSPoint(x: formatMP4Rect.midX - mp4Size.width / 2, y: formatMP4Rect.midY - mp4Size.height / 2),
+                        withAttributes: exportAsGIF ? unselAttrs : selAttrs)
+            gifStr.draw(at: NSPoint(x: formatGIFRect.midX - gifSize.width / 2, y: formatGIFRect.midY - gifSize.height / 2),
+                        withAttributes: exportAsGIF ? selAttrs : unselAttrs)
+            x += segW + 12
+        }
+
         if !compact {
             let infoAttrs: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 10, weight: .regular),
@@ -459,18 +505,17 @@ private final class VideoEditorView: NSView {
             ]
             let fileSize = (try? FileManager.default.attributesOfItem(atPath: videoURL.path)[.size] as? Int) ?? 0
             let sizeStr = ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file)
-            let ext = videoURL.pathExtension.uppercased()
             let fpsValue = asset?.tracks(withMediaType: .video).first?.nominalFrameRate ?? 0
-            let fpsStr = fpsValue > 0 ? "  ·  \(Int(fpsValue.rounded()))fps" : ""
+            let fpsStr = fpsValue > 0 ? "\(Int(fpsValue.rounded()))fps  ·  " : ""
             var resStr = ""
             if let track = asset?.tracks(withMediaType: .video).first {
                 let size = track.naturalSize.applying(track.preferredTransform)
-                resStr = "  ·  \(Int(abs(size.width)))×\(Int(abs(size.height)))"
+                resStr = "\(Int(abs(size.width)))×\(Int(abs(size.height)))"
             } else if isGIF, let src = CGImageSourceCreateWithURL(videoURL as CFURL, nil),
                       let img = CGImageSourceCreateImageAtIndex(src, 0, nil) {
-                resStr = "  ·  \(img.width)×\(img.height)"
+                resStr = "\(img.width)×\(img.height)"
             }
-            let infoStr = "\(ext)  ·  \(sizeStr)\(fpsStr)\(resStr)" as NSString
+            let infoStr = "\(sizeStr)  ·  \(fpsStr)\(resStr)" as NSString
             let infoSize = infoStr.size(withAttributes: infoAttrs)
             infoStr.draw(at: NSPoint(x: x + 4, y: btnY + (btnH - infoSize.height) / 2), withAttributes: infoAttrs)
         }
@@ -627,7 +672,7 @@ private final class VideoEditorView: NSView {
     }
 
     private func drawIconButton(rect: NSRect, symbol: String, accent: Bool, active: Bool = false, dimmed: Bool = false) {
-        let bg = accent ? NSColor.systemPurple : (active ? NSColor.systemPurple.withAlphaComponent(0.4) : NSColor.white.withAlphaComponent(dimmed ? 0.04 : 0.1))
+        let bg = accent ? ToolbarLayout.accentColor : (active ? ToolbarLayout.accentColor.withAlphaComponent(0.4) : NSColor.white.withAlphaComponent(dimmed ? 0.04 : 0.1))
         bg.setFill()
         NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
 
@@ -739,6 +784,14 @@ private final class VideoEditorView: NSView {
             return
         }
 
+        // Format toggle
+        if formatMP4Rect.contains(point) && exportAsGIF {
+            exportAsGIF = false; savedURL = nil; needsDisplay = true; return
+        }
+        if formatGIFRect.contains(point) && !exportAsGIF {
+            exportAsGIF = true; savedURL = nil; needsDisplay = true; return
+        }
+
         // Buttons
         if playBtnRect.contains(point) { togglePlayPause(); return }
         if muteBtnRect.contains(point) { toggleMute(); return }
@@ -825,19 +878,37 @@ private final class VideoEditorView: NSView {
     }
 
     private func copyToClipboard() {
+        // If GIF mode is selected but no GIF has been saved yet, convert to a temp GIF first
+        if exportAsGIF && !isGIF && !(savedURL?.pathExtension.lowercased() == "gif") {
+            showStatus(L("Converting to GIF…"))
+            let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".gif")
+            convertToGIF(destURL: tmpURL) { [weak self] success in
+                guard let self = self, success else { return }
+                self.copyGIFData(from: tmpURL)
+            }
+            return
+        }
+
         let url = savedURL ?? videoURL
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
         if isGIF || url.pathExtension.lowercased() == "gif" {
-            if let data = try? Data(contentsOf: url) {
-                let item = NSPasteboardItem()
-                item.setData(data, forType: NSPasteboard.PasteboardType("com.compuserve.gif"))
-                item.setString(url.absoluteString, forType: .fileURL)
-                pasteboard.writeObjects([item])
-            }
+            copyGIFData(from: url)
         } else {
             pasteboard.writeObjects([url as NSURL])
+            showStatus(L("Copied to clipboard!"))
+        }
+    }
+
+    private func copyGIFData(from url: URL) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        if let data = try? Data(contentsOf: url) {
+            let item = NSPasteboardItem()
+            item.setData(data, forType: NSPasteboard.PasteboardType("com.compuserve.gif"))
+            item.setString(url.absoluteString, forType: .fileURL)
+            pasteboard.writeObjects([item])
         }
         showStatus(L("Copied to clipboard!"))
     }
@@ -879,58 +950,51 @@ private final class VideoEditorView: NSView {
     }
 
     private func saveVideo() {
-        guard let dirURL = SaveDirectoryAccess.resolveRecordingDirectoryIfAccessible() else {
-            // No valid bookmark — fall back to Save As panel
+        if exportAsGIF && !isGIF {
+            // GIF mode: need Save As panel since extension changes
             saveVideoAs()
             return
         }
-        let ext = videoURL.pathExtension
+        guard let dirURL = SaveDirectoryAccess.resolveRecordingDirectoryIfAccessible() else {
+            saveVideoAs()
+            return
+        }
+        let ext = exportAsGIF ? "gif" : videoURL.pathExtension
         let name = videoURL.deletingPathExtension().lastPathComponent + ".\(ext)"
         let destURL = dirURL.appendingPathComponent(name)
-        saveToDestination(destURL, dirURL: dirURL)
+        if exportAsGIF && !isGIF {
+            convertToGIF(destURL: destURL)
+        } else {
+            saveToDestination(destURL, dirURL: dirURL)
+        }
     }
 
     private func saveVideoAs() {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.mpeg4Movie]
-        panel.nameFieldStringValue = videoURL.deletingPathExtension().lastPathComponent + ".mp4"
+        let saveAsGIF = exportAsGIF && !isGIF
+        panel.allowedContentTypes = saveAsGIF ? [.gif] : (isGIF ? [.gif] : [.mpeg4Movie])
+        let ext = saveAsGIF ? "gif" : videoURL.pathExtension
+        panel.nameFieldStringValue = videoURL.deletingPathExtension().lastPathComponent + ".\(ext)"
         panel.directoryURL = SaveDirectoryAccess.recordingDirectoryHint()
         panel.level = .statusBar + 3
         panel.begin { [weak self] response in
             guard let self = self, response == .OK, let url = panel.url else { return }
-            self.saveToDestination(url, dirURL: nil)
+            if saveAsGIF {
+                self.convertToGIF(destURL: url)
+            } else {
+                self.saveToDestination(url, dirURL: nil)
+            }
         }
     }
 
     private func showSaveMenu() {
-        let menu = NSMenu()
-        let saveAsItem = NSMenuItem(title: L("Save As…"), action: #selector(saveAsAction), keyEquivalent: "")
-        saveAsItem.target = self
-        menu.addItem(saveAsItem)
-        menu.addItem(NSMenuItem.separator())
-        let gifItem = NSMenuItem(title: L("Save as GIF…"), action: #selector(saveAsGIFAction), keyEquivalent: "")
-        gifItem.target = self
-        menu.addItem(gifItem)
-        let pos = NSPoint(x: saveArrowRect.minX, y: saveArrowRect.maxY)
-        menu.popUp(positioning: nil, at: pos, in: self)
+        // Currently unused — save arrow just does Save As
+        saveVideoAs()
     }
 
-    @objc private func saveAsAction() { saveVideoAs() }
-
-    @objc private func saveAsGIFAction() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.gif]
-        panel.nameFieldStringValue = videoURL.deletingPathExtension().lastPathComponent + ".gif"
-        panel.directoryURL = SaveDirectoryAccess.recordingDirectoryHint()
-        panel.level = .statusBar + 3
-        panel.begin { [weak self] response in
-            guard let self = self, response == .OK, let url = panel.url else { return }
-            self.convertToGIF(destURL: url)
-        }
-    }
-
-    private func convertToGIF(destURL: URL) {
-        guard let asset = asset else { return }
+    private func convertToGIF(destURL: URL, completion: ((Bool) -> Void)? = nil) {
+        guard let asset = asset else { completion?(false); return }
+        isConvertingGIF = true
         showStatus(L("Converting to GIF…"))
 
         let startTime = CMTime(seconds: trimStart, preferredTimescale: 600)
@@ -943,7 +1007,11 @@ private final class VideoEditorView: NSView {
             do {
                 let reader = try AVAssetReader(asset: asset)
                 guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-                    await MainActor.run { self?.showStatus(L("No video track found"), isError: true) }
+                    await MainActor.run {
+                        self?.isConvertingGIF = false
+                        self?.showStatus(L("No video track found"), isError: true)
+                        completion?(false)
+                    }
                     return
                 }
                 let outputSettings: [String: Any] = [
@@ -972,13 +1040,17 @@ private final class VideoEditorView: NSView {
                 try FileManager.default.moveItem(at: tmpURL, to: destURL)
 
                 await MainActor.run {
+                    self?.isConvertingGIF = false
                     self?.savedURL = destURL
                     self?.showStatus(String(format: L("Saved to %@"), destURL.lastPathComponent))
                     self?.needsDisplay = true
+                    completion?(true)
                 }
             } catch {
                 await MainActor.run {
+                    self?.isConvertingGIF = false
                     self?.showStatus(L("GIF conversion failed"), isError: true)
+                    completion?(false)
                 }
             }
         }
