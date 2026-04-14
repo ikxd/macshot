@@ -181,11 +181,25 @@ jobs:
       # ── 6. Package into DMG ────────────────────────────────────────────────
       - name: Package DMG
         run: |
-          hdiutil create \
-            -volname "macshot" \
-            -srcfolder "build/Build/Products/Release/macshot.app" \
-            -ov -format UDZO \
-            MacShot.dmg
+          brew install create-dmg
+          # Stage the .app in a folder (create-dmg copies folder contents into DMG)
+          mkdir -p /tmp/dmg-staging
+          cp -R "build/Build/Products/Release/macshot.app" /tmp/dmg-staging/
+          # create-dmg returns exit code 2 if it can't set the volume icon
+          # (no .icns at the root), which is fine — the app icon shows up anyway.
+          create-dmg \
+            --volname "macshot" \
+            --background "assets/dmg-background.png" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "macshot.app" 150 185 \
+            --app-drop-link 450 185 \
+            --no-internet-enable \
+            --hide-extension "macshot.app" \
+            MacShot.dmg \
+            /tmp/dmg-staging \
+            || [ $? -eq 2 ]
 
       # ── 7. Notarize ────────────────────────────────────────────────────────
       - name: Notarize

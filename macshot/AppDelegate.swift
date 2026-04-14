@@ -60,6 +60,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
             return
         }
 
+        // Offer to move to /Applications if running from a DMG or translocated path
+        promptToMoveToApplicationsIfNeeded()
+
         updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
         setupMainMenu()
         setupStatusBar()
@@ -143,6 +146,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
     func setMenuBarIconVisible(_ visible: Bool) {
         statusItem.isVisible = visible
+    }
+
+    /// If the app is running from a DMG volume or a translocated path,
+    /// offer to move it to /Applications for proper operation (auto-updates,
+    /// persistent preferences, no translocation issues).
+    private func promptToMoveToApplicationsIfNeeded() {
+        let bundlePath = Bundle.main.bundlePath
+        let isOnDMG = bundlePath.hasPrefix("/Volumes/")
+        let isTranslocated = bundlePath.contains("/AppTranslocation/")
+        guard isOnDMG || isTranslocated else { return }
+        guard !UserDefaults.standard.bool(forKey: "suppressMoveToApplications") else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Move to Applications folder?"
+        alert.informativeText = "macshot is running from a disk image. Move it to your Applications folder for auto-updates and best experience."
+        alert.addButton(withTitle: "Move to Applications")
+        alert.addButton(withTitle: "Not Now")
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Don't ask again"
+
+        let response = alert.runModal()
+        if alert.suppressionButton?.state == .on {
+            UserDefaults.standard.set(true, forKey: "suppressMoveToApplications")
+        }
+        guard response == .alertFirstButtonReturn else { return }
+
+        let dest = URL(fileURLWithPath: "/Applications/macshot.app")
+        let src = URL(fileURLWithPath: bundlePath)
+        do {
+            // Remove old version if present
+            if FileManager.default.fileExists(atPath: dest.path) {
+                try FileManager.default.removeItem(at: dest)
+            }
+            try FileManager.default.copyItem(at: src, to: dest)
+            // Relaunch from /Applications
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            task.arguments = ["-n", dest.path]
+            try task.run()
+            NSApp.terminate(nil)
+        } catch {
+            let errAlert = NSAlert()
+            errAlert.messageText = "Could not move to Applications"
+            errAlert.informativeText = "Please drag macshot to your Applications folder manually.\n\n\(error.localizedDescription)"
+            errAlert.runModal()
+        }
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
