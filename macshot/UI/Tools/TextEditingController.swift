@@ -347,7 +347,7 @@ class TextEditingController {
             // Shrink width to fit the actual text (+ insets) so the bounding
             // box doesn't extend far past the text content.
             let fittedWidth = ceil(textBounds.width) + inset.width * 2
-            let imgWidth = max(fittedWidth, fontSize + 12)  // minimum width
+            let imgWidth = max(fittedWidth, 20)  // minimum width for tiny text
             let imgSize = NSSize(width: imgWidth, height: imgHeight)
 
             // Update scrollView frame to match the measured size so canvas
