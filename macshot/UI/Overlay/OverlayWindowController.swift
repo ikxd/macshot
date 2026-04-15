@@ -594,7 +594,10 @@ extension OverlayWindowController: OverlayViewDelegate {
                 let scale = view.window?.backingScaleFactor ?? 2.0
                 let pxW = Int(sel.width * scale)
                 let pxH = Int(sel.height * scale)
-                let cs = CGColorSpaceCreateDeviceRGB()
+                // Preserve the source image's color space so the editor and saved
+                // files render correct colors on every display.
+                let srcCG = src.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                let cs = srcCG?.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
                 let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
                 guard let ctx = CGContext(
                     data: nil, width: pxW, height: pxH,

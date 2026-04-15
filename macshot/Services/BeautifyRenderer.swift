@@ -577,7 +577,7 @@ class BeautifyRenderer {
         // Linear gradient fallback
         let colors = style.stops.map { $0.0.cgColor } as CFArray
         var locations = style.stops.map { $0.1 }
-        let cs = CGColorSpaceCreateDeviceRGB()
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
 
         guard let gradient = CGGradient(colorsSpace: cs, colors: colors, locations: &locations) else { return }
 

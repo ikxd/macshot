@@ -2606,9 +2606,8 @@ class OverlayView: NSView {
 
         let w = cgImage.width
         let h = cgImage.height
-        // Use a known-good pixel format — the source image's bitmapInfo may be
-        // unsupported by CGContext (e.g. 16-bit float or unusual alpha layout).
-        let cs = CGColorSpaceCreateDeviceRGB()
+        // Preserve the source image's color space so colors stay correct.
+        let cs = cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard
             let ctx = CGContext(
@@ -2656,7 +2655,7 @@ class OverlayView: NSView {
 
         let w = cgImage.width
         let h = cgImage.height
-        let cs = CGColorSpaceCreateDeviceRGB()
+        let cs = cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard
             let ctx = CGContext(
@@ -2775,7 +2774,7 @@ class OverlayView: NSView {
         let newPxW = max(1, Int(newPtW * scale))
         let newPxH = max(1, Int(newPtH * scale))
 
-        let cs = oldCG.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let cs = oldCG.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         guard let ctx = CGContext(
             data: nil, width: newPxW, height: newPxH,
             bitsPerComponent: 8, bytesPerRow: 0, space: cs,
@@ -3075,7 +3074,7 @@ class OverlayView: NSView {
 
         // Cache the bitmap context — only recreate if the image dimensions changed
         if autoMeasureBitmapCtx == nil || autoMeasureBitmapW != w || autoMeasureBitmapH != h {
-            let srgb = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+            let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
             guard let ctx = CGContext(
                 data: nil, width: w, height: h,
                 bitsPerComponent: 8, bytesPerRow: w * 4,
@@ -7280,7 +7279,7 @@ class OverlayView: NSView {
         let scale = window?.backingScaleFactor ?? 2.0
         let pxW = Int(ceil(size.width * scale))
         let pxH = Int(ceil(size.height * scale))
-        let colorSpace = window?.screen?.colorSpace?.cgColorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let colorSpace = window?.screen?.colorSpace?.cgColorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         guard let cgCtx = CGContext(
             data: nil, width: pxW, height: pxH,
             bitsPerComponent: 8, bytesPerRow: 0,
@@ -7318,7 +7317,7 @@ class OverlayView: NSView {
         let scale = window?.backingScaleFactor ?? 2.0
         let pxW = Int(ceil(size.width * scale))
         let pxH = Int(ceil(size.height * scale))
-        let colorSpace = window?.screen?.colorSpace?.cgColorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let colorSpace = window?.screen?.colorSpace?.cgColorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         guard let cgCtx = CGContext(
             data: nil, width: pxW, height: pxH,
             bitsPerComponent: 8, bytesPerRow: 0,
@@ -7429,7 +7428,7 @@ class OverlayView: NSView {
            let srcCS = cg.colorSpace {
             cs = srcCS
         } else {
-            cs = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+            cs = CGColorSpace(name: CGColorSpace.sRGB)!
         }
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
         guard

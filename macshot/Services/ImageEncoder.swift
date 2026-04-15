@@ -74,7 +74,7 @@ enum ImageEncoder {
             let pixelH = bitmap.pixelsHigh
 
             if pixelW > logicalW && pixelH > logicalH {
-                let cs = cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+                let cs = cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
                 let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
                 guard let ctx = CGContext(
                     data: nil,
@@ -142,7 +142,7 @@ enum ImageEncoder {
         let w = srcImage.width
         let h = srcImage.height
         // Re-render into a known premultipliedLast RGBA context (preserving source color space)
-        let cs = srcImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let cs = srcImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         guard let ctx = CGContext(
             data: nil, width: w, height: h,
             bitsPerComponent: 8, bytesPerRow: w * 4,

@@ -136,7 +136,7 @@ class ScreenCaptureManager {
         let h = src.height
         // Use the source image's color space (typically display P3 on modern Macs) so
         // CoreGraphics doesn't need a color space conversion when drawing to screen.
-        let cs = src.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let cs = src.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         // Try RGBA first (universally compatible), fall back to BGRA, then
         // sRGB if the display's color space doesn't support either format.
         let formats: [(CGColorSpace, UInt32)] = [

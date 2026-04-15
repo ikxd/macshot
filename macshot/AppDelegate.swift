@@ -1210,7 +1210,7 @@ extension AppDelegate: OverlayWindowControllerDelegate {
            let srcCS = cg.colorSpace {
             cs = srcCS
         } else {
-            cs = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+            cs = CGColorSpace(name: CGColorSpace.sRGB)!
         }
         guard let cgCtx = CGContext(data: nil, width: pixelW, height: pixelH,
                                      bitsPerComponent: 8, bytesPerRow: pixelW * 4,

@@ -533,7 +533,7 @@ final class ScrollCaptureController {
 
         let totalH = existingH + newRows
 
-        let cs = CGColorSpaceCreateDeviceRGB()
+        let cs = existing.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard let ctx = CGContext(data: nil, width: w, height: totalH,
                                   bitsPerComponent: 8, bytesPerRow: w * 4,

@@ -74,7 +74,7 @@ final class GIFEncoder {
         // then copy into an owned context so the image survives after unlock.
         // CGImageDestinationFinalize reads all frames later — each CGImage
         // must own its pixel data independently.
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard let srcCtx = CGContext(
             data: baseAddress,

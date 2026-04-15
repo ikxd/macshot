@@ -1,5 +1,10 @@
 # Changelog
 
+## [4.0.5-beta.10] - 2026-04-15
+
+### Fixed
+- **Wrong colors on external monitors (editor + saved files)** — replaced all uses of `CGColorSpaceCreateDeviceRGB()` (device-dependent, untagged) with either the source image's ICC profile or explicit sRGB. Fixes wildly shifted colors on displays with non-standard color profiles (e.g. ViewSonic VX4380, VG2448).
+
 ## [4.0.5-beta.9] - 2026-04-15
 
 ### Added

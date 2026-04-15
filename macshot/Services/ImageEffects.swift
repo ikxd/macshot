@@ -116,7 +116,7 @@ enum ImageEffects {
 
         // Render back to NSImage
         let extent = ciImage.extent
-        let colorSpace = cgImage.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let colorSpace = cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         guard let outputCG = ciContext.createCGImage(ciImage, from: extent, format: .RGBA8, colorSpace: colorSpace) else {
             return image
         }

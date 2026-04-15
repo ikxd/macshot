@@ -1648,7 +1648,7 @@ class Annotation {
             let pixelBlock = 8
             let tinyW = max(1, cgImage.width / pixelBlock)
             let tinyH = max(1, cgImage.height / pixelBlock)
-            let cs = CGColorSpaceCreateDeviceRGB()
+            let cs = cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
             let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
 
             guard let ctx1 = CGContext(data: nil, width: tinyW, height: tinyH,
@@ -1799,7 +1799,7 @@ class Annotation {
         // Render the fill: for each pixel, blend horizontal interpolation (left↔right)
         // with vertical interpolation (bottom↔top)
         let outW = iw, outH = ih
-        let cs = CGColorSpaceCreateDeviceRGB()
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
         guard let ctx = CGContext(data: nil, width: outW, height: outH,
                                   bitsPerComponent: 8, bytesPerRow: outW * 4,
@@ -1936,7 +1936,7 @@ class Annotation {
             NSColor.white.withAlphaComponent(0.95).cgColor,
             NSColor(white: 0.7, alpha: 0.85).cgColor,
         ] as CFArray
-        return CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0.0, 1.0])
+        return CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!, colors: colors, locations: [0.0, 1.0])
     }()
 
     private func drawLoupe(in context: NSGraphicsContext) {

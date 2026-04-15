@@ -644,7 +644,7 @@ private class AddCaptureOverlayHandler: NSObject, OverlayWindowControllerDelegat
         let scale = controller.screen.backingScaleFactor
         let pixelW = Int(globalRect.width * scale)
         let pixelH = Int(globalRect.height * scale)
-        let cs = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
         guard let cgCtx = CGContext(data: nil, width: pixelW, height: pixelH,
                                      bitsPerComponent: 8, bytesPerRow: pixelW * 4,
                                      space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
