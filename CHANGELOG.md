@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.0.5-beta.22] - 2026-04-17
+
+### Changed
+- **Settings window redesign** — cleaner layout and stable Debug signing.
+
+### Fixed
+- **Mono theme selected-tool contrast** — the selected tool's icon is now readable against the Mono accent (was white-on-light-gray, now white-on-dark-gray).
+
 ## [4.0.5-beta.13] - 2026-04-15
 
 ### Added
